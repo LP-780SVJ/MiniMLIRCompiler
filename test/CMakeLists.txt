@@ -9,3 +9,12 @@ add_test(NAME mini-parse-ping
 add_test(NAME mini-reject-unknown-op
   COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
     ${CMAKE_CURRENT_SOURCE_DIR}/unknown-mini-op.mlir)
+add_test(NAME mini-reject-i32-tensor
+  COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/dialect/invalid-type.mlir)
+add_test(NAME mini-reject-dynamic-shape
+  COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/dialect/invalid-dynamic.mlir)
+add_test(NAME mini-reject-extra-operand
+  COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/dialect/invalid-arity.mlir)
