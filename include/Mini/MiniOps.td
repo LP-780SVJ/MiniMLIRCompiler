@@ -39,6 +39,7 @@ def AddOp : Mini_Op<"add", [Pure]> {
   let results = (outs
     StaticShapeTensorOf<[F32]>:$result
   );
+  let hasVerifier = 1;
 }
 
 // Day 9：逐元素 Tensor 乘法
@@ -60,6 +61,7 @@ def MulOp : Mini_Op<"mul", [Pure]> {
   let results = (outs
     StaticShapeTensorOf<[F32]>:$result
   );
+  let hasVerifier = 1;
 }
 
 // Day 9：逐元素 ReLU
@@ -80,6 +82,7 @@ def ReluOp : Mini_Op<"relu", [Pure]> {
   let results = (outs
     StaticShapeTensorOf<[F32]>:$result
   );
+  let hasVerifier = 1;
 }
 
 #endif // MINI_OPS_TD

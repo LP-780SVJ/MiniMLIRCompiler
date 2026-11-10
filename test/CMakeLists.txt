@@ -18,3 +18,9 @@ add_test(NAME mini-reject-dynamic-shape
 add_test(NAME mini-reject-extra-operand
   COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
     ${CMAKE_CURRENT_SOURCE_DIR}/dialect/invalid-arity.mlir)
+add_test(NAME mini-verifier-regression
+  COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/verifier/check-verifier.sh
+    $<TARGET_FILE:mini-opt>)
+add_test(NAME mini-verifier-diagnostics
+  COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/verifier/diagnostics.mlir -o /dev/null)
