@@ -27,8 +27,7 @@ def AddOp : Mini_Op<"add", [Pure]> {
     The first version requires statically shaped tensors
     with identical shapes. Broadcasting is not supported.
 
-    Shape equality is verified by a custom verifier
-    in the next development stage.
+    Shape equality is verified by a custom verifier.
   }];
 
   let arguments = (ins
@@ -79,6 +78,24 @@ def ReluOp : Mini_Op<"relu", [Pure]> {
     StaticShapeTensorOf<[F32]>:$input
   );
 
+  let results = (outs
+    StaticShapeTensorOf<[F32]>:$result
+  );
+  let hasVerifier = 1;
+}
+
+// Day 11: fused element-wise addition followed by ReLU.
+def AddReluOp : Mini_Op<"add_relu", [Pure]> {
+  let summary = "Fused element-wise Add and ReLU";
+  let description = [{
+    Computes element-wise max(lhs + rhs, 0). Both operands and the result
+    must have identical static shapes and f32 element types. Broadcasting
+    is not supported.
+  }];
+  let arguments = (ins
+    StaticShapeTensorOf<[F32]>:$lhs,
+    StaticShapeTensorOf<[F32]>:$rhs
+  );
   let results = (outs
     StaticShapeTensorOf<[F32]>:$result
   );

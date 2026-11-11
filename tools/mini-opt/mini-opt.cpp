@@ -1,13 +1,17 @@
 
 #include "Mini/MiniDialect.h"
+#include "Mini/MiniPasses.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+#include "mlir/Transforms/Passes.h"
 
 int main(int argc, char **argv) {
+  mlir::mini::registerMiniPasses();
+  mlir::registerTransformsPasses();
   mlir::DialectRegistry registry;
 
   // 注册本项目的 Mini Dialect

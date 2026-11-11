@@ -1,9 +1,11 @@
 
 set(LIBS
   MLIRMini
+  MLIRMiniTransforms
   MLIRArithDialect
   MLIRFuncDialect
   MLIROptLib
+  MLIRTransforms
 )
 
 add_llvm_executable(mini-opt

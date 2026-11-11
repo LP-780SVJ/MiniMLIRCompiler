@@ -50,6 +50,13 @@ LogicalResult MulOp::verify() {
       llvm::cast<RankedTensorType>(getResult().getType()));
 }
 
+LogicalResult AddReluOp::verify() {
+  return verifyBinaryTensorTypes(
+      getOperation(), llvm::cast<RankedTensorType>(getLhs().getType()),
+      llvm::cast<RankedTensorType>(getRhs().getType()),
+      llvm::cast<RankedTensorType>(getResult().getType()));
+}
+
 LogicalResult ReluOp::verify() {
   auto inputType = llvm::cast<RankedTensorType>(getInput().getType());
   auto resultType = llvm::cast<RankedTensorType>(getResult().getType());

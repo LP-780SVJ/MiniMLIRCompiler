@@ -24,3 +24,6 @@ add_test(NAME mini-verifier-regression
 add_test(NAME mini-verifier-diagnostics
   COMMAND $<TARGET_FILE:mini-opt> --verify-diagnostics
     ${CMAKE_CURRENT_SOURCE_DIR}/verifier/diagnostics.mlir -o /dev/null)
+add_test(NAME mini-fusion-regression
+  COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/transforms/check-fusion.sh
+    $<TARGET_FILE:mini-opt>)
