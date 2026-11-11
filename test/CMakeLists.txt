@@ -27,3 +27,6 @@ add_test(NAME mini-verifier-diagnostics
 add_test(NAME mini-fusion-regression
   COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/transforms/check-fusion.sh
     $<TARGET_FILE:mini-opt>)
+add_test(NAME mini-lowering-regression
+  COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/conversion/check-lowering.sh
+    $<TARGET_FILE:mini-opt>)

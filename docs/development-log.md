@@ -126,3 +126,30 @@ Operation 定义融合后的合法 IR；Pattern 决定何时安全改写；Pass 
 在哪个 IR 层级和 Pipeline 阶段运行。当前测试证明结构、SSA 和验证
 行为，尚未验证数值执行或性能收益。后续需要为 `mini.add_relu` 以及
 未融合的 Add、Mul、Relu 补齐 Lowering，保证两条路径都能继续编译。
+
+## Day 12：Mini 到 Linalg 的基础 Lowering
+
+新增 `MLIRMiniToLinalg` Conversion 库与 Module Pass `mini-to-linalg`。
+同一 `BinaryOpLowering` 模板处理 `mini.add` 和 `mini.mul`：每个模式
+创建 `tensor.empty` 作为输出目标，并以三个恒等 indexing map、两个
+parallel iterator 构造 `linalg.generic`。Region 内分别使用
+`arith.addf` / `arith.mulf` 计算标量元素，再由 `linalg.yield` 返回。
+转换模式使用 adaptor 提供的 Operand，并让 rewriter 将原 Mini 结果的
+SSA 使用者接到新 Linalg 结果。当前阶段保持 `tensor<...xf32>` 类型，
+因此没有引入 TypeConverter。
+
+`ConversionTarget` 允许 Arith、Linalg、Tensor、Func 与 Module；
+Mini Dialect 整体标为非法，只对尚未 Lowering 的 `mini.relu` 和
+`mini.add_relu` 给出合法例外。`applyPartialConversion` 允许这两种
+操作暂存，却会拒绝没有转换规则的 `mini.ping`。这使“合法的输入 IR”
+和“满足本阶段目标的 IR”成为两个分别可检验的条件。
+
+配置后构建 `mini-opt` 成功。`check-lowering.sh` 覆盖 Add、Mul、
+混合 IR、转换后重解析、类型与 SSA 返回值连接、恒等访问映射、parallel
+迭代、非法 `mini.ping` 和输入 Shape 错误。完整 CTest **11/11 通过**。
+`test/conversion/results/` 保存了转换前后与 Pass 调试输出，便于对照。
+
+这是从自定义图级 Mini IR 向标准 Tensor/Linalg/Arith IR 的第一步。
+当前输出仍是张量级结构化计算，尚无 Bufferization、循环降级、LLVM IR
+或可执行代码；Day 13 需要继续 Lowering `mini.relu` 和
+`mini.add_relu`，并对完整目标 IR 采用更严格的合法化检查。

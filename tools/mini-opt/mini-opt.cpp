@@ -1,9 +1,12 @@
 
 #include "Mini/MiniDialect.h"
+#include "Mini/MiniLowering.h"
 #include "Mini/MiniPasses.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
@@ -11,6 +14,7 @@
 
 int main(int argc, char **argv) {
   mlir::mini::registerMiniPasses();
+  mlir::mini::registerMiniLoweringPasses();
   mlir::registerTransformsPasses();
   mlir::DialectRegistry registry;
 
@@ -20,7 +24,9 @@ int main(int argc, char **argv) {
   // 注册本周示例可能使用的标准 Dialect
   registry.insert<
       mlir::arith::ArithDialect,
-      mlir::func::FuncDialect>();
+      mlir::func::FuncDialect,
+      mlir::linalg::LinalgDialect,
+      mlir::tensor::TensorDialect>();
 
   // 复用 MLIR 的 opt 工具基础设施
   return mlir::asMainReturnCode(

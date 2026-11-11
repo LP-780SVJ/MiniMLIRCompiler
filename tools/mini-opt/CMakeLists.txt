@@ -2,8 +2,11 @@
 set(LIBS
   MLIRMini
   MLIRMiniTransforms
+  MLIRMiniToLinalg
   MLIRArithDialect
   MLIRFuncDialect
+  MLIRLinalgDialect
+  MLIRTensorDialect
   MLIROptLib
   MLIRTransforms
 )
