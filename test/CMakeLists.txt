@@ -30,3 +30,6 @@ add_test(NAME mini-fusion-regression
 add_test(NAME mini-lowering-regression
   COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/conversion/check-lowering.sh
     $<TARGET_FILE:mini-opt>)
+add_test(NAME mini-full-pipeline-regression
+  COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/conversion/check-full-pipeline.sh
+    $<TARGET_FILE:mini-opt>)

@@ -81,16 +81,15 @@ absent '"mini.mul"' "$TMP/mul.mlir"
 echo 'PASS: mul lowering and round-trip'
 
 lower mixed-lowering.mlir "$TMP/mixed.mlir"
-expect_count '"linalg.generic"' 2 "$TMP/mixed.mlir"
+expect_count '"linalg.generic"' 4 "$TMP/mixed.mlir"
 check_elementwise_structure "$TMP/mixed.mlir" '2x4xf32'
-contains '"mini.relu"' "$TMP/mixed.mlir"
-contains '"mini.add_relu"' "$TMP/mixed.mlir"
 contains '"arith.addf"' "$TMP/mixed.mlir"
 contains '"arith.mulf"' "$TMP/mixed.mlir"
-absent '"mini.add"' "$TMP/mixed.mlir"
-absent '"mini.mul"' "$TMP/mixed.mlir"
+contains '"arith.cmpf"' "$TMP/mixed.mlir"
+contains '"arith.select"' "$TMP/mixed.mlir"
+absent '"mini.' "$TMP/mixed.mlir"
 "$MINI" "$TMP/mixed.mlir" -o /dev/null
-echo 'PASS: partial conversion and mixed IR round-trip'
+echo 'PASS: complete conversion and mixed IR round-trip'
 
 "$MINI" "$TEST/unsupported.mlir" -o /dev/null
 if "$MINI" "$TEST/unsupported.mlir" --pass-pipeline="$PIPELINE" \

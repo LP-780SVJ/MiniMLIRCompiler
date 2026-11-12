@@ -1,8 +1,15 @@
 #ifndef MINI_MINIPASSES_H
 #define MINI_MINIPASSES_H
 
-namespace mlir::mini {
+#include <memory>
+
+namespace mlir {
+class Pass;
+
+namespace mini {
+std::unique_ptr<Pass> createAddReluFusionPass();
 void registerMiniPasses();
-} // namespace mlir::mini
+} // namespace mini
+} // namespace mlir
 
 #endif // MINI_MINIPASSES_H

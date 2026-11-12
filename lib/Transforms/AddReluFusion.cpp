@@ -65,3 +65,7 @@ struct AddReluFusionPass
 void mlir::mini::registerMiniPasses() {
   PassRegistration<AddReluFusionPass>();
 }
+
+std::unique_ptr<mlir::Pass> mlir::mini::createAddReluFusionPass() {
+  return std::make_unique<AddReluFusionPass>();
+}

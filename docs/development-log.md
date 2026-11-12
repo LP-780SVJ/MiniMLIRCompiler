@@ -153,3 +153,44 @@ Mini Dialect 整体标为非法，只对尚未 Lowering 的 `mini.relu` 和
 当前输出仍是张量级结构化计算，尚无 Bufferization、循环降级、LLVM IR
 或可执行代码；Day 13 需要继续 Lowering `mini.relu` 和
 `mini.add_relu`，并对完整目标 IR 采用更严格的合法化检查。
+
+## Day 13：完整 Lowering 与 Mini 编译流水线
+
+### 新增的计算语义与转换
+
+新增公共 `emitReluScalar`，用标量 `arith.constant + arith.cmpf ogt +
+arith.select` 定义 ReLU：有序且大于正零时保留输入，其余情况选择
+`+0.0f`。因此 NaN 与 `-0.0f` 都输出 `+0.0f`。独立
+`mini.relu` 与融合的 `mini.add_relu` 使用同一函数，避免融合前后
+出现不同的特殊值处理。它们分别 Lowering 为一个 `linalg.generic`；
+Relu 有一个输入和一个输出，因此使用两个 indexing map；AddRelu 有
+两个输入和一个输出，因此使用三个。AddRelu 在同一个 Region 内先
+`arith.addf`，再比较、选择，保留融合后的结构化计算表示。
+
+### 合法化与 Pipeline
+
+`mini-to-linalg` 现在注册 Add、Mul、Relu、AddRelu 四条转换规则，
+改用 `applyFullConversion`。目标允许 Module、Func、Tensor、Linalg、
+Arith；整个 Mini Dialect 非法，已不再给 Relu/AddRelu 例外。
+因此 `mini.ping` 虽然能解析和验证，因没有转换规则而被拒绝。
+
+为两个自定义 Pass 提供 Factory，保留原有命令行注册能力。
+`mini-opt` 注册 `mini-compile`：函数级 canonicalize → 函数级
+AddReluFusion → 模块级 MiniToLinalg → 函数级 CSE → 函数级
+canonicalize。Factory 让 Driver 组合 Pass，而不需要公开具体 Pass 类。
+完整流水线在输出中不保留 Mini Operation。
+
+### 构建与验收
+
+`mini-opt` 构建成功，命令行显示 `mini-compile`。独立验证了 Relu、
+AddRelu Lowering；集成验证了 Add/Mul、可融合的 Add→Relu、
+不可融合的 Mul→Relu、非法 `mini.ping`、非法输入 Shape、转换后
+重新解析和二次运行 Pipeline。测试还检查两个 Linalg 计算之间及
+函数返回处的 SSA 数据流。旧 Day 12 回归脚本已更新为 Day 13 的
+完整合法化预期。完整 CTest **12/12 通过**。
+
+`test/conversion/results/` 保存了单独转换、融合后、完整转换后和逐
+Pass 调试输出。完整 IR 已是标准 Tensor/Linalg/Arith/Func 表示，
+仍未执行数值计算，也未进行 Bufferization、循环降级或机器码生成。
+`arith.addf` 本身也支持 Tensor Operand；选择 Linalg 是为了在本项目
+显式保留迭代空间、访问映射与标量 Region，供后续结构化优化使用。

@@ -20,6 +20,18 @@ using namespace mlir;
 
 namespace {
 
+// ReLU(x) = x for ordered x > +0.0, otherwise +0.0. This chooses +0.0
+// for NaN and -0.0; both Mini lowering paths must share the same rule.
+static Value emitReluScalar(OpBuilder &builder, Location loc, Value input) {
+  auto zero = arith::ConstantOp::create(
+      builder, loc, builder.getF32FloatAttr(0.0f));
+  auto positive = arith::CmpFOp::create(
+      builder, loc, arith::CmpFPredicate::OGT, input, zero.getResult());
+  auto result = arith::SelectOp::create(
+      builder, loc, positive.getResult(), input, zero.getResult());
+  return result.getResult();
+}
+
 // Both Mini operations have identical tensor access. Only the scalar body
 // differs, so keep their shape and indexing rules in one conversion pattern.
 template <typename MiniOp, typename ScalarOp>
@@ -63,13 +75,83 @@ struct BinaryOpLowering : OpConversionPattern<MiniOp> {
 using AddOpLowering = BinaryOpLowering<mini::AddOp, arith::AddFOp>;
 using MulOpLowering = BinaryOpLowering<mini::MulOp, arith::MulFOp>;
 
+struct ReluOpLowering : OpConversionPattern<mini::ReluOp> {
+  using OpConversionPattern<mini::ReluOp>::OpConversionPattern;
+  using OpAdaptor = OpConversionPattern<mini::ReluOp>::OpAdaptor;
+
+  LogicalResult matchAndRewrite(mini::ReluOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    Value input = adaptor.getInput();
+    if (input.getType() != resultType)
+      return rewriter.notifyMatchFailure(op, "input and result types must match");
+
+    Location loc = op.getLoc();
+    auto empty = tensor::EmptyOp::create(
+        rewriter, loc, resultType.getShape(), resultType.getElementType(),
+        resultType.getEncoding());
+    unsigned rank = resultType.getRank();
+    AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
+    SmallVector<AffineMap> indexingMaps{identityMap, identityMap};
+    SmallVector<utils::IteratorType> iteratorTypes(
+        rank, utils::IteratorType::parallel);
+
+    auto generic = linalg::GenericOp::create(
+        rewriter, loc, resultType, ValueRange{input},
+        ValueRange{empty.getResult()}, indexingMaps, iteratorTypes,
+        [&](OpBuilder &builder, Location nestedLoc, ValueRange args) {
+          Value activated = emitReluScalar(builder, nestedLoc, args[0]);
+          linalg::YieldOp::create(builder, nestedLoc, activated);
+        });
+    rewriter.replaceOp(op, generic->getResults());
+    return success();
+  }
+};
+
+struct AddReluOpLowering : OpConversionPattern<mini::AddReluOp> {
+  using OpConversionPattern<mini::AddReluOp>::OpConversionPattern;
+  using OpAdaptor = OpConversionPattern<mini::AddReluOp>::OpAdaptor;
+
+  LogicalResult matchAndRewrite(mini::AddReluOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    Value lhs = adaptor.getLhs();
+    Value rhs = adaptor.getRhs();
+    if (lhs.getType() != resultType || rhs.getType() != resultType)
+      return rewriter.notifyMatchFailure(
+          op, "operands and result types must match");
+
+    Location loc = op.getLoc();
+    auto empty = tensor::EmptyOp::create(
+        rewriter, loc, resultType.getShape(), resultType.getElementType(),
+        resultType.getEncoding());
+    unsigned rank = resultType.getRank();
+    AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
+    SmallVector<AffineMap> indexingMaps{identityMap, identityMap, identityMap};
+    SmallVector<utils::IteratorType> iteratorTypes(
+        rank, utils::IteratorType::parallel);
+
+    auto generic = linalg::GenericOp::create(
+        rewriter, loc, resultType, ValueRange{lhs, rhs},
+        ValueRange{empty.getResult()}, indexingMaps, iteratorTypes,
+        [&](OpBuilder &builder, Location nestedLoc, ValueRange args) {
+          auto sum = arith::AddFOp::create(
+              builder, nestedLoc, args[0], args[1]);
+          Value activated = emitReluScalar(builder, nestedLoc, sum.getResult());
+          linalg::YieldOp::create(builder, nestedLoc, activated);
+        });
+    rewriter.replaceOp(op, generic->getResults());
+    return success();
+  }
+};
+
 struct MiniToLinalgPass
     : PassWrapper<MiniToLinalgPass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MiniToLinalgPass)
 
   StringRef getArgument() const override { return "mini-to-linalg"; }
   StringRef getDescription() const override {
-    return "Lower mini.add and mini.mul to tensor/linalg/arith";
+    return "Lower Mini tensor operations to tensor/linalg/arith";
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -84,12 +166,12 @@ struct MiniToLinalgPass
                            tensor::TensorDialect, func::FuncDialect>();
     target.addLegalOp<ModuleOp>();
     target.addIllegalDialect<mini::MiniDialect>();
-    target.addLegalOp<mini::ReluOp, mini::AddReluOp>();
 
     RewritePatternSet patterns(&context);
-    patterns.add<AddOpLowering, MulOpLowering>(&context);
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns))))
+    patterns.add<AddOpLowering, MulOpLowering, ReluOpLowering,
+                 AddReluOpLowering>(&context);
+    if (failed(applyFullConversion(getOperation(), target,
+                                   std::move(patterns))))
       signalPassFailure();
   }
 };
@@ -98,4 +180,8 @@ struct MiniToLinalgPass
 
 void mlir::mini::registerMiniLoweringPasses() {
   PassRegistration<MiniToLinalgPass>();
+}
+
+std::unique_ptr<mlir::Pass> mlir::mini::createMiniToLinalgPass() {
+  return std::make_unique<MiniToLinalgPass>();
 }
