@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "target": "coral-npu-experimental",
+  "status": "research_only",
+  "isa": {
+    "architecture": "riscv32",
+    "compiler_abi": "ilp32",
+    "compiler_zvt_version": "0.4",
+    "compiler_features": [
+      "+m",
+      "+f",
+      "+zbb",
+      "+zvl128b",
+      "+zve32f",
+      "+zfbfmin",
+      "+zvfbfmin",
+      "+zvfbfwma",
+      "+zvtbase",
+      "+zvt8e",
+      "+zvt16e",
+      "+zvti8i32mm",
+      "+zvtf16f32mm",
+      "+zvtf32f32mm"
+    ],
+    "standalone_mpact_compatibility": "unverified"
+  },
+  "memory": {
+    "scope": "compiler_defaults",
+    "dtcm_bytes": 32768,
+    "stack_reserved_bytes": 4096,
+    "runtime_reserved_bytes": 4096,
+    "tile_budget_granularity_bytes": 4096,
+    "default_tile_budget_bytes": 24576
+  },
+  "toolchain": {
+    "compiler_repo": "google-coral/coralnpu-compiler",
+    "compiler_commit": "770dc9332dffed8ff91d8cface7e9d176227d912",
+    "simulator_repo": "google-coral/coralnpu-mpact",
+    "standalone_mpact_commit": "704b28ce126debd2d951f9c3b36704080d75dc60",
+    "integrated_mpact_base_commit": "704b28ce126debd2d951f9c3b36704080d75dc60",
+    "native_macos_arm64_integration": "unverified"
+  }
+}

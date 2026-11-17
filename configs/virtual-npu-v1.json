@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "target": "virtual-npu-v1",
+  "description": "Educational FP32 NPU",
+  "compute": {
+    "matrix_units": 1,
+    "native_matmul_tile": {
+      "m": 32,
+      "n": 32,
+      "k": 32
+    },
+    "input_dtype": "float32",
+    "accumulator_dtype": "float32",
+    "matmul_semantics": "accumulate"
+  },
+  "memory": {
+    "sram_bytes": 262144,
+    "reserved_bytes": 0,
+    "alignment_bytes": 64,
+    "dram_model": "linear_bytes",
+    "layout": "row_major"
+  },
+  "dma": {
+    "mode": "synchronous",
+    "supports_2d_strided": true,
+    "buffering": "single"
+  }
+}
