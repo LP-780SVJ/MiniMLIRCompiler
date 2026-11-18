@@ -194,3 +194,14 @@ Pass 调试输出。完整 IR 已是标准 Tensor/Linalg/Arith/Func 表示，
 仍未执行数值计算，也未进行 Bufferization、循环降级或机器码生成。
 `arith.addf` 本身也支持 Tensor Operand；选择 Linalg 是为了在本项目
 显式保留迭代空间、访问映射与标量 Region，供后续结构化优化使用。
+
+## Day 19：MatMul Graph IR 和 ONNX 前端
+
+新增 `mini.matmul`，沿用 Mini TableGen 注册链。ODS 检查操作数个数和
+静态 FP32 类型，C++ Verifier 检查两个矩阵的归约维及结果形状。导入器
+读取真实 `ModelProto`，检查支持范围，合并类型信息，并按 SSA 关系发射
+Mini IR。单节点、双节点和多输出顺序实际通过 `mini-opt` 验证。
+
+原有 12 项 CTest 和新增 5 项均通过。MatMul 可以表示在 Graph IR 中，
+当前 Linalg 转换仍会以非法目标操作拒绝它。详细命令、诊断和 Day 20
+的接口见 [Day 19 验收](npu/day19-review.md)。

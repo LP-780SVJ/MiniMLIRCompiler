@@ -50,6 +50,34 @@ LogicalResult MulOp::verify() {
       llvm::cast<RankedTensorType>(getResult().getType()));
 }
 
+LogicalResult MatMulOp::verify() {
+  auto lhsType = llvm::cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = llvm::cast<RankedTensorType>(getRhs().getType());
+  auto resultType = llvm::cast<RankedTensorType>(getResult().getType());
+
+  if (lhsType.getRank() != 2 || rhsType.getRank() != 2 ||
+      resultType.getRank() != 2)
+    return emitOpError() << "requires rank-2 lhs, rhs and result tensors, got "
+                         << lhsType << ", " << rhsType << ", " << resultType;
+
+  for (RankedTensorType type : {lhsType, rhsType, resultType})
+    if (type.getDimSize(0) <= 0 || type.getDimSize(1) <= 0)
+      return emitOpError() << "requires positive dimensions, got " << type;
+
+  if (lhsType.getDimSize(1) != rhsType.getDimSize(0))
+    return emitOpError() << "requires matching K dimensions, got lhs K = "
+                         << lhsType.getDimSize(1)
+                         << " and rhs K = " << rhsType.getDimSize(0);
+
+  auto rows = lhsType.getDimSize(0);
+  auto columns = rhsType.getDimSize(1);
+  if (resultType.getDimSize(0) != rows || resultType.getDimSize(1) != columns)
+    return emitOpError() << "requires result shape [" << rows << ", " << columns
+                         << "], got " << resultType;
+
+  return success();
+}
+
 LogicalResult AddReluOp::verify() {
   return verifyBinaryTensorTypes(
       getOperation(), llvm::cast<RankedTensorType>(getLhs().getType()),

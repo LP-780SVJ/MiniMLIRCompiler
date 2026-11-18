@@ -102,4 +102,19 @@ def AddReluOp : Mini_Op<"add_relu", [Pure]> {
   let hasVerifier = 1;
 }
 
+def MatMulOp : Mini_Op<"matmul", [Pure]> {
+  let summary = "Matrix multiplication of two FP32 tensors";
+  let description = [{
+    Computes [M,K] x [K,N] -> [M,N] by reducing products over K.
+    Both operands and the result are rank-two f32 tensors with positive
+    static dimensions. There are no target-specific tile constraints.
+  }];
+  let arguments = (ins
+    StaticShapeTensorOf<[F32]>:$lhs,
+    StaticShapeTensorOf<[F32]>:$rhs
+  );
+  let results = (outs StaticShapeTensorOf<[F32]>:$result);
+  let hasVerifier = 1;
+}
+
 #endif // MINI_OPS_TD

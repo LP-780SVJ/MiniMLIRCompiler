@@ -33,3 +33,18 @@ add_test(NAME mini-lowering-regression
 add_test(NAME mini-full-pipeline-regression
   COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/conversion/check-full-pipeline.sh
     $<TARGET_FILE:mini-opt>)
+
+add_test(NAME mini-matmul-valid
+  COMMAND $<TARGET_FILE:mini-opt> ${CMAKE_CURRENT_SOURCE_DIR}/matmul/valid.mlir -o /dev/null)
+add_test(NAME mini-matmul-diagnostics
+  COMMAND $<TARGET_FILE:mini-opt> --split-input-file --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/matmul/diagnostics.mlir -o /dev/null)
+
+set(MINI_ONNX_PYTHON "" CACHE FILEPATH "Python interpreter with ONNX for importer tests")
+if(MINI_ONNX_PYTHON)
+  foreach(case IN ITEMS matmul-import two-matmul-import reject-unsupported)
+    add_test(NAME onnx-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_matmul_import.py
+        $<TARGET_FILE:mini-opt> ${case})
+  endforeach()
+endif()

@@ -1,6 +1,6 @@
 # Day 18 · ONNX 导入契约
 
-本页定义 Day 19–20 的 Python Importer。入口实际读取 `ModelProto`，输出可由 `mini-opt` 解析、验证的 Generic MLIR。[计划 CLI](../../python/onnx_importer/README.md)
+本页定义 Day 19–20 的 Python Importer。已实现的 Day 19 入口读取 `ModelProto`，输出可由 `mini-opt` 解析、验证的 Generic MLIR。当前只接受标准域 Opset 18、无 Initializer、正尺寸静态二维 FP32 MatMul 图，可包含多个 MatMul 和多个有序输出。下文的逐元素算子和常量属于扩展契约。[CLI](../../python/onnx_importer/README.md)、[Day 19 验收](day19-review.md)
 
 ## 输入域与支持范围
 
@@ -23,7 +23,7 @@ ONNX MatMul 有更广的秩与批量语义，ONNX Add 允许多向广播。Impor
 4. 按拓扑顺序处理 Node，查出所有输入的已有 SSA 定义，检查 arity、属性和类型，生成结果 SSA，并在成功创建后登记。遇到未定义输入或重复输出定义立即停止。内部 SSA 名如 `%arg0`、`%c0`、`%v0` 由 Importer 生成。原始名称用于查找与诊断。
 5. 按 `graph.output` 顺序查找 SSA、核对其类型并生成 `func.return`。测试用现有 `mini-opt` 重新解析和验证。导入失败时只返回诊断，成功后才发布完整输出，避免留下看似可用的半份 IR。
 
-以 Day 18 fixture 为例，`X → %arg0`，`W → %c0`，第一个 Node 写入 `H → %v0`，ReLU 读取同一个 `%v0`，再定义 `Y → %v1`。如果 `H` 有两个消费者，两处应引用同一个 SSA 值。多消费者共享和多输出顺序都是后续验收项。
+Day 19 已验证 `H → %v0` 供第二个 MatMul 读取，并按 `graph.output` 顺序返回 `Y, H`。Day 18 fixture 的扩展导入中，`X → %arg0`，`W → %c0`，第一个节点写入 `H → %v0`，ReLU 读取同一个 `%v0`，再定义 `Y → %v1`。如果 `H` 有两个消费者，两处都引用同一个 SSA 值。
 
 ## 权重与诊断
 

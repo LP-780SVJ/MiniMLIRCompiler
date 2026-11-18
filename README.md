@@ -1,8 +1,8 @@
 # MiniMLIRCompiler
 
-基于本地 LLVM/MLIR 23.1.4 的独立 C++ 学习项目。当前（Week 2 Day 13）
+基于本地 LLVM/MLIR 23.1.4 的独立学习项目。Week 2
 已实现 Mini Dialect、静态 FP32 Tensor 算子、Verifier、Add + Relu 融合，
-以及到 Tensor/Linalg/Arith 的完整计算算子 Lowering。`mini-opt` 可通过
+以及四种算子到 Tensor/Linalg/Arith 的 Lowering。`mini-opt` 可通过
 `mini-compile` 运行组合流水线，输出不含 Mini Operation 的标准 MLIR。
 
 ```text
@@ -10,6 +10,11 @@
              → MiniToLinalg Full Conversion → CSE → canonicalize
              → 标准 Tensor / Linalg / Arith / Func IR
 ```
+
+Week 3 Day 19 打通 `ONNX → Mini Graph IR`，支持从真实 ONNX 图导入静态
+二维 FP32 MatMul。参见 [Importer 用法](python/onnx_importer/README.md) 和
+[Day 19 验收](docs/npu/day19-review.md)。MatMul 可由 `mini-opt` 解析与验证，
+当前 `mini-compile` 尚无对应的 Linalg 转换规则。
 
 ## 构建与运行
 
@@ -50,8 +55,9 @@ bash code/MiniMLIRCompiler/test/conversion/check-full-pipeline.sh
 | `mini.mul` | 逐元素乘法 | 2 / 1 |
 | `mini.relu` | 逐元素 ReLU | 1 / 1 |
 | `mini.add_relu` | 融合的逐元素 Add + ReLU | 2 / 1 |
+| `mini.matmul` | 二维矩阵乘法 `[M,K] × [K,N] → [M,N]` | 2 / 1 |
 
-四个 Tensor 算子要求静态 Shape、FP32 元素类型，输入与结果的完整 Tensor
+四个逐元素 Tensor 算子要求静态 Shape、FP32 元素类型，输入与结果的完整 Tensor
 Type 一致。`mini.add` 不支持 Broadcasting；`mini.mul` 是逐元素乘法。
 ODS 检查每个 Operand/Result 的基本类型；C++ Verifier 检查它们之间
 的 Shape 与 Type 关系。当前 Lowering 将 ReLU 明确实现为有序
@@ -95,6 +101,10 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 完整合法化拒绝。
 
 ## 测试与当前边界
+
+Day 19 的 CTest **17/17 通过**，包含原有 12 项、MatMul IR 正反例和
+3 项 ONNX 集成测试。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
+启用后者；未设置时可独立构建和测试 C++ 工程。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
 可融合与不可融合的计算图、SSA 结果连接、输出重新解析、重复运行、
