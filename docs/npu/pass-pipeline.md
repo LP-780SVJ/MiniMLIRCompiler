@@ -23,5 +23,5 @@ code/MiniMLIRCompiler/build/bin/mini-opt weighted_matmul.npu.mlir -o /dev/null
 | 日期 | 工程入口 | 验收 |
 | --- | --- | --- |
 | Day 19 | 在 [MiniOps.td](../../include/Mini/MiniOps.td) 新增 MatMul ODS，在 [MiniOps.cpp](../../lib/Dialect/Mini/MiniOps.cpp) 新增 Verifier，新增 Importer 与测试。 | 复用 [Mini TableGen](../../include/Mini/CMakeLists.txt)，真实 ONNX 两输入 MatMul 经导入后能被 driver 解析。 |
-| Day 20 | 新增 `include/NPU/`、`lib/Dialect/NPU/`，接入 [include CMake](../../include/CMakeLists.txt)、[lib CMake](../../lib/CMakeLists.txt) 和 [driver 目标](../../tools/mini-opt/CMakeLists.txt)，规划库名 `MLIRNPUDialect`。 | driver 注册后能解析并验证 `npu.matmul`，Importer 验证共享常量和多节点 SSA。 |
+| Day 20 | 新增 `include/NPU/`、`lib/Dialect/NPU/`，接入 [include CMake](../../include/CMakeLists.txt)、[lib CMake](../../lib/CMakeLists.txt) 和 [driver 目标](../../tools/mini-opt/CMakeLists.txt)，库名为 `MLIRNPUDialect`。 | driver 已能独立验证 `npu.matmul`，Importer 已验证共享常量和多节点 SSA。 |
 | Day 21 | 新增 `include/Mini/MiniNPULowering.h`、`lib/Conversion/MiniToNPU.cpp`，在 [Conversion CMake](../../lib/Conversion/CMakeLists.txt) 加独立 `MLIRMiniToNPU`，driver 链接并注册 Pass。 | 复用 [CTest](../../test/CMakeLists.txt) 的真实 `mini-opt` 目标执行正反例、回归及 ONNX→Mini→NPU 集成。 |

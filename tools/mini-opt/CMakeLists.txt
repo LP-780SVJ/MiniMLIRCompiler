@@ -3,6 +3,7 @@ set(LIBS
   MLIRMini
   MLIRMiniTransforms
   MLIRMiniToLinalg
+  MLIRNPUDialect
   MLIRArithDialect
   MLIRFuncDialect
   MLIRLinalgDialect

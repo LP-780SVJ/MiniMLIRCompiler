@@ -16,6 +16,10 @@ Week 3 Day 19 打通 `ONNX → Mini Graph IR`，支持从真实 ONNX 图导入�
 [Day 19 验收](docs/npu/day19-review.md)。MatMul 可由 `mini-opt` 解析与验证，
 当前 `mini-compile` 尚无对应的 Linalg 转换规则。
 
+Day 20 支持内嵌 FP32 权重，以及 MatMul、同形状 Add/Mul、ReLU 的组合导入。
+`mini-opt` 也可独立验证 `npu.matmul`；MiniToNPU 转换安排在 Day 21。
+CPU 参考输出、比较器及复现命令见 [Day 20 验收](docs/npu/day20-review.md)。
+
 ## 构建与运行
 
 在 `AI-Compiler` 根目录运行，复用已有 LLVM/MLIR 构建：
@@ -102,9 +106,9 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 
 ## 测试与当前边界
 
-Day 19 的 CTest **17/17 通过**，包含原有 12 项、MatMul IR 正反例和
-3 项 ONNX 集成测试。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
-启用后者；未设置时可独立构建和测试 C++ 工程。
+Day 20 的 CTest **22/22 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、参考数据
+及比较器错误注入。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
+启用 Python 测试；未设置时可独立构建和测试 C++ 工程。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
 可融合与不可融合的计算图、SSA 结果连接、输出重新解析、重复运行、

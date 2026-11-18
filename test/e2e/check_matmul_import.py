@@ -1,12 +1,14 @@
 """Check real ONNX files through the importer CLI and the Mini IR verifier."""
 
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
 
+import numpy as np
 import onnx
-from onnx import TensorProto, helper
+from onnx import TensorProto, helper, numpy_helper
 
 
 MODELS = Path(__file__).resolve().parent / "models"
@@ -20,10 +22,10 @@ def import_file(model: Path, output: Path) -> subprocess.CompletedProcess:
     )
 
 
-def checked_ir(mini_opt: str, model: Path, output: Path) -> str:
+def checked_ir(mini_opt: str, model: Path, output: Path, *options: str) -> str:
     imported = import_file(model, output)
     assert imported.returncode == 0, imported.stderr
-    parsed = subprocess.run([mini_opt, str(output)], capture_output=True, text=True)
+    parsed = subprocess.run([mini_opt, str(output), *options], capture_output=True, text=True)
     assert parsed.returncode == 0, parsed.stderr
     return parsed.stdout
 
@@ -54,6 +56,63 @@ def check_chain(mini_opt: str, directory: Path) -> None:
     assert "-> (tensor<2x5xf32>, tensor<2x4xf32>)" in ir, ir
     assert "return %1, %0 : tensor<2x5xf32>, tensor<2x4xf32>" in ir, ir
     print("PASS: inferred intermediate, chained SSA use and graph output order")
+
+
+def check_weighted(mini_opt: str, directory: Path) -> None:
+    for name, chain in (
+        ("weighted_matmul", ("matmul",)),
+        ("matmul_relu", ("matmul", "relu")),
+        ("matmul_add_relu", ("matmul", "add", "relu")),
+    ):
+        ir = checked_ir(mini_opt, MODELS / f"{name}.onnx", directory / f"{name}.mlir")
+        assert "func.func @main(%arg0: tensor<2x3xf32>) -> tensor<2x4xf32>" in ir, ir
+        assert '%0 = "mini.matmul"(%arg0, %cst)' in ir, ir
+        assert re.findall(r'"mini\.(\w+)"', ir) == list(chain), ir
+        assert "arith.constant dense<" in ir, ir
+        if "add" in chain:
+            assert '%1 = "mini.add"(%0, %cst_0)' in ir, ir
+        if "relu" in chain:
+            last = len(chain) - 1
+            assert f'%{last} = "mini.relu"(%{last - 1})' in ir, ir
+        assert f"return %{len(chain) - 1} : tensor<2x4xf32>" in ir, ir
+        print(f"PASS: {name} parameter, constant and SSA chain")
+
+    model = onnx.load(MODELS / "weighted_matmul.onnx")
+    bits = np.array(
+        [0x3F800000, 0xBF000000, 0x80000000, 0x00000001, 0x3EAAAAAB, 0,
+         0x40400000, 0xC0800000, 0x3DCCCCCD, 0xBF800000, 0x00800000, 0x7F7FFFFF],
+        dtype=np.uint32,
+    )
+    model.graph.initializer[0].CopyFrom(numpy_helper.from_array(bits.view(np.float32).reshape(3, 4), name="W"))
+    model.graph.node.append(helper.make_node("MatMul", ["X", "W"], ["Z"]))
+    model.graph.output.insert(0, helper.make_tensor_value_info("Z", TensorProto.FLOAT, [2, 4]))
+    source = directory / "shared.onnx"
+    for raw in (True, False):
+        if not raw:
+            values = numpy_helper.to_array(model.graph.initializer[0])
+            model.graph.initializer[0].CopyFrom(
+                helper.make_tensor("W", TensorProto.FLOAT, [3, 4], values.reshape(-1))
+            )
+        onnx.save_model(model, source)
+        ir = checked_ir(
+            mini_opt, source, directory / "shared.mlir", "--mlir-print-elementsattrs-with-hex-if-larger=0",
+        )
+        payloads = re.findall(r'arith.constant dense<"0x([0-9A-Fa-f]+)"> : tensor<3x4xf32>', ir)
+        assert len(payloads) == 1, ir
+        decoded = np.frombuffer(bytes.fromhex(payloads[0]), dtype="<u4")
+        np.testing.assert_array_equal(decoded, bits)
+        assert ir.count('"mini.matmul"(%arg0, %cst)') == 2, ir
+        assert "return %1, %0 : tensor<2x4xf32>, tensor<2x4xf32>" in ir, ir
+    print("PASS: shared initializer and reversed result order; raw_data and float_data retain every FP32 bit")
+
+    model = onnx.load(MODELS / "matmul_add_relu.onnx")
+    model.graph.node[1].op_type = "Mul"
+    source = directory / "matmul_mul_relu.onnx"
+    onnx.save_model(model, source)
+    ir = checked_ir(mini_opt, source, directory / "matmul_mul_relu.mlir")
+    assert '%1 = "mini.mul"(%0, %cst_0)' in ir and '%2 = "mini.relu"(%1)' in ir, ir
+    multitile = checked_ir(mini_opt, MODELS / "matmul_multitile.onnx", directory / "multitile.mlir")
+    assert '"mini.matmul"(%arg0, %cst) : (tensor<64x96xf32>, tensor<96x64xf32>) -> tensor<64x64xf32>' in multitile
 
 
 def matmul_model(lhs, rhs, result, dtype=TensorProto.FLOAT) -> onnx.ModelProto:
@@ -109,6 +168,42 @@ def check_rejections(directory: Path) -> None:
     annotations = onnx.load(MODELS / "matmul_chain.onnx")
     annotations.graph.value_info.append(helper.make_tensor_value_info("H", TensorProto.FLOAT, [2, 5]))
     cases.append(("conflicting_value_info", annotations, "E_SHAPE_MISMATCH", False))
+    broadcast = onnx.load(MODELS / "matmul_add_relu.onnx")
+    broadcast.graph.initializer[1].CopyFrom(
+        numpy_helper.from_array(np.zeros(4, dtype=np.float32), name="B")
+    )
+    cases.append(("broadcast_add", broadcast, "E_BROADCAST_UNSUPPORTED", True))
+    bad_attribute = onnx.load(MODELS / "matmul.onnx")
+    bad_attribute.graph.node[0].attribute.append(helper.make_attribute("alpha", 1.0))
+    cases.append(("attribute", bad_attribute, "E_ATTRIBUTE_UNSUPPORTED", False))
+
+    def add_weight_case(name, change, diagnostic):
+        model = onnx.load(MODELS / "weighted_matmul.onnx")
+        change(model)
+        cases.append((name, model, diagnostic, False))
+
+    def externalize(model):
+        tensor = model.graph.initializer[0]
+        onnx.external_data_helper.set_external_data(tensor, location="missing.bin")
+        tensor.ClearField("raw_data")
+
+    add_weight_case("external", externalize, "E_INITIALIZER_UNSUPPORTED")
+    add_weight_case("overridable", lambda model: model.graph.input.append(
+        helper.make_tensor_value_info("W", TensorProto.FLOAT, [3, 4])
+    ), "E_INITIALIZER_UNSUPPORTED")
+    add_weight_case("sparse", lambda model: model.graph.sparse_initializer.add(), "E_INITIALIZER_UNSUPPORTED")
+    add_weight_case("truncated_weight", lambda model: setattr(
+        model.graph.initializer[0], "raw_data", b"123"
+    ), "E_INVALID_GRAPH")
+    add_weight_case("nonfinite_weight", lambda model: model.graph.initializer[0].CopyFrom(
+        numpy_helper.from_array(np.full((3, 4), np.nan, dtype=np.float32), name="W")
+    ), "E_INITIALIZER_UNSUPPORTED")
+    add_weight_case("oversize_weight", lambda model: model.graph.initializer[0].CopyFrom(
+        numpy_helper.from_array(np.zeros((3, 6000), dtype=np.float32), name="W")
+    ), "E_INITIALIZER_UNSUPPORTED")
+    add_weight_case("fp16_weight", lambda model: model.graph.initializer[0].CopyFrom(
+        numpy_helper.from_array(np.zeros((3, 4), dtype=np.float16), name="W")
+    ), "E_UNSUPPORTED_DTYPE")
 
     for name, model, diagnostic, valid_onnx in cases:
         if valid_onnx:
@@ -124,7 +219,6 @@ def check_rejections(directory: Path) -> None:
     assert existing.read_bytes() == b"previous successful output\n"
     print("PASS: failed import preserves existing output")
 
-    expect_rejection(MODELS / "matmul_relu.onnx", directory / "weighted.mlir", "E_INITIALIZER_UNSUPPORTED")
     invalid_bytes = directory / "invalid.onnx"
     invalid_bytes.write_bytes(b"not a protobuf")
     expect_rejection(invalid_bytes, directory / "invalid.mlir", "E_MODEL_READ")
@@ -138,6 +232,8 @@ if __name__ == "__main__":
             check_single(mini_opt, directory)
         elif case == "two-matmul-import":
             check_chain(mini_opt, directory)
+        elif case == "weighted-import":
+            check_weighted(mini_opt, directory)
         elif case == "reject-unsupported":
             check_rejections(directory)
         else:

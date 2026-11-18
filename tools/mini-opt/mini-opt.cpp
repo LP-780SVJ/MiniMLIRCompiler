@@ -2,6 +2,7 @@
 #include "Mini/MiniDialect.h"
 #include "Mini/MiniLowering.h"
 #include "Mini/MiniPasses.h"
+#include "NPU/NPUDialect.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -32,6 +33,7 @@ int main(int argc, char **argv) {
 
   // 注册本项目的 Mini Dialect
   registry.insert<mlir::mini::MiniDialect>();
+  registry.insert<mlir::npu::NPUDialect>();
 
   // 注册本周示例可能使用的标准 Dialect
   registry.insert<

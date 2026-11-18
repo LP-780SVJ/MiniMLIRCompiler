@@ -1,3 +1,4 @@
 add_subdirectory(Dialect/Mini)
+add_subdirectory(Dialect/NPU)
 add_subdirectory(Transforms)
 add_subdirectory(Conversion)

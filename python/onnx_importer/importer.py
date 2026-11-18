@@ -1,4 +1,4 @@
-"""Import the Day 19 ONNX subset into generic Mini MLIR."""
+"""Import the supported ONNX subset into generic Mini MLIR."""
 
 import argparse
 from dataclasses import dataclass
@@ -6,10 +6,16 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from math import prod
 
 from google.protobuf.message import DecodeError
+import numpy as np
 import onnx
-from onnx import TensorProto, checker, shape_inference
+from onnx import TensorProto, checker, numpy_helper, shape_inference
+
+
+OP_ARITY = {"MatMul": 2, "Add": 2, "Mul": 2, "Relu": 1}
+MAX_INITIALIZER_BYTES = 64 * 1024
 
 
 class ModelError(ValueError):
@@ -19,13 +25,12 @@ class ModelError(ValueError):
 
 @dataclass(frozen=True)
 class TensorType:
-    shape: tuple[int, int]
+    shape: tuple[int, ...]
     dtype: str
 
     @property
     def mlir_type(self) -> str:
-        rows, columns = self.shape
-        return f"tensor<{rows}x{columns}x{self.dtype}>"
+        return "tensor<" + "x".join([*map(str, self.shape), self.dtype]) + ">"
 
 
 @dataclass(frozen=True)
@@ -49,25 +54,30 @@ def check_subset(model: onnx.ModelProto) -> None:
     if not model.HasField("graph"):
         raise ModelError("E_INVALID_GRAPH", "model is missing a graph")
     graph = model.graph
-    if graph.initializer or graph.sparse_initializer:
-        names = [value.name for value in graph.initializer]
-        names.extend(value.values.name for value in graph.sparse_initializer)
-        raise ModelError("E_INITIALIZER_UNSUPPORTED", f"Day 19 does not import Initializers: {names!r}")
+    if graph.sparse_initializer:
+        raise ModelError("E_INITIALIZER_UNSUPPORTED", "Sparse Initializer is unsupported")
+    input_names = {info.name for info in graph.input}
+    for tensor in graph.initializer:
+        if tensor.name in input_names:
+            raise ModelError("E_INITIALIZER_UNSUPPORTED", f"Initializer {tensor.name!r} is an overridable input")
+        if tensor.data_location == TensorProto.EXTERNAL or tensor.external_data:
+            raise ModelError("E_INITIALIZER_UNSUPPORTED", f"Initializer {tensor.name!r}: External Data")
     if model.functions or model.training_info:
         raise ModelError("E_UNSUPPORTED_OP", "local functions and training graphs are unsupported")
     if not graph.node or not graph.output:
-        raise ModelError("E_INVALID_GRAPH", "expected at least one MatMul node and one graph output")
+        raise ModelError("E_INVALID_GRAPH", "expected at least one node and one graph output")
 
     for index, node in enumerate(graph.node):
         where = node_label(index, node)
         if node.domain != "":
             raise ModelError("E_UNSUPPORTED_DOMAIN", f"{where}: domain {node.domain!r}")
-        if node.op_type != "MatMul" or node.overload:
-            raise ModelError("E_UNSUPPORTED_OP", f"{where}: only standard MatMul is supported")
+        if node.op_type not in OP_ARITY or node.overload:
+            raise ModelError("E_UNSUPPORTED_OP", f"{where}: unsupported operator")
         if node.attribute:
-            raise ModelError("E_ATTRIBUTE_UNSUPPORTED", f"{where}: MatMul takes no attributes")
-        if len(node.input) != 2 or len(node.output) != 1 or not all((*node.input, *node.output)):
-            raise ModelError("E_INVALID_GRAPH", f"{where}: expected two named inputs and one named output")
+            raise ModelError("E_ATTRIBUTE_UNSUPPORTED", f"{where}: {node.op_type} takes no attributes")
+        arity = OP_ARITY[node.op_type]
+        if len(node.input) != arity or len(node.output) != 1 or not all((*node.input, *node.output)):
+            raise ModelError("E_INVALID_GRAPH", f"{where}: expected {arity} named inputs and one named output")
 
 
 def read_tensor_type(info: onnx.ValueInfoProto, where: str) -> TensorType:
@@ -80,14 +90,12 @@ def read_tensor_type(info: onnx.ValueInfoProto, where: str) -> TensorType:
     if not tensor.HasField("shape"):
         raise ModelError("E_DYNAMIC_SHAPE", f"{location}: missing shape")
     dimensions = tensor.shape.dim
-    if len(dimensions) != 2:
-        raise ModelError("E_UNSUPPORTED_RANK", f"{location}: expected rank 2, got {len(dimensions)}")
     if any(not dim.HasField("dim_value") for dim in dimensions):
         raise ModelError("E_DYNAMIC_SHAPE", f"{location}: expected static dimensions, got {tensor.shape}")
-    rows, columns = (dim.dim_value for dim in dimensions)
-    if rows <= 0 or columns <= 0:
-        raise ModelError("E_SHAPE_MISMATCH", f"{location}: expected positive dimensions, got [{rows}, {columns}]")
-    return TensorType((rows, columns), "f32")
+    shape = tuple(dim.dim_value for dim in dimensions)
+    if any(dim <= 0 for dim in shape):
+        raise ModelError("E_SHAPE_MISMATCH", f"{location}: expected positive dimensions, got {shape}")
+    return TensorType(shape, "f32")
 
 
 def collect_type_info(graph: onnx.GraphProto) -> dict[str, list[onnx.ValueInfoProto]]:
@@ -113,29 +121,75 @@ def lookup_value(value_map: dict[str, ValueRef], name: str, where: str) -> Value
     return value_map[name]
 
 
-def emit_matmul(
+def read_initializer(tensor: TensorProto) -> np.ndarray:
+    where = f"Initializer {tensor.name!r}"
+    if tensor.data_type != TensorProto.FLOAT:
+        raise ModelError("E_UNSUPPORTED_DTYPE", f"{where}: expected FP32")
+    shape = tuple(tensor.dims)
+    if any(dim <= 0 for dim in shape):
+        raise ModelError("E_SHAPE_MISMATCH", f"{where}: expected positive dimensions, got {shape}")
+    count = prod(shape)
+    byte_count = count * np.dtype(np.float32).itemsize
+    if byte_count > MAX_INITIALIZER_BYTES:
+        raise ModelError("E_INITIALIZER_UNSUPPORTED", f"{where}: exceeds {MAX_INITIALIZER_BYTES} bytes")
+    if tensor.HasField("raw_data"):
+        valid_size = len(tensor.raw_data) == byte_count and not tensor.float_data
+    else:
+        valid_size = len(tensor.float_data) == count
+    if not valid_size:
+        raise ModelError("E_INITIALIZER_UNSUPPORTED", f"{where}: payload does not match {count} FP32 elements")
+    try:
+        array = numpy_helper.to_array(tensor)
+    except (TypeError, ValueError, RuntimeError) as error:
+        raise ModelError("E_INITIALIZER_UNSUPPORTED", f"{where}: {error}") from error
+    if array.dtype != np.float32:
+        raise ModelError("E_UNSUPPORTED_DTYPE", f"{where}: decoded {array.dtype}, expected FP32")
+    if array.shape != shape or array.size != count:
+        raise ModelError("E_SHAPE_MISMATCH", f"{where}: decoded data does not match {shape}")
+    if not np.isfinite(array).all():
+        raise ModelError("E_INITIALIZER_UNSUPPORTED", f"{where}: expected finite weights")
+    return array
+
+
+def format_dense(bits: int | list) -> str:
+    if isinstance(bits, list):
+        return "[" + ", ".join(map(format_dense, bits)) + "]"
+    return f"0x{bits:08X}"
+
+
+def emit_node(
     index: int,
     node: onnx.NodeProto,
     type_map: dict[str, list[onnx.ValueInfoProto]],
     value_map: dict[str, ValueRef],
 ) -> str:
     where = node_label(index, node)
-    lhs, rhs = (lookup_value(value_map, name, where) for name in node.input)
+    operands = [lookup_value(value_map, name, where) for name in node.input]
     output_name = node.output[0]
     if output_name in value_map:
         raise ModelError("E_INVALID_GRAPH", f"{where}: repeated definition of {output_name!r}")
-    rows, lhs_k = lhs.type.shape
-    rhs_k, columns = rhs.type.shape
-    if lhs_k != rhs_k:
-        raise ModelError("E_SHAPE_MISMATCH", f"{where}: K mismatch for {lhs.type.shape} and {rhs.type.shape}")
     result_type = get_value_type(type_map, output_name, where)
-    if result_type.shape != (rows, columns):
-        raise ModelError("E_SHAPE_MISMATCH", f"{where}: expected [{rows}, {columns}], got {result_type.shape}")
+    expected_shape = operands[0].type.shape
+    if node.op_type == "MatMul":
+        lhs_shape, rhs_shape = (value.type.shape for value in operands)
+        if any(len(shape) != 2 for shape in (lhs_shape, rhs_shape, result_type.shape)):
+            raise ModelError("E_UNSUPPORTED_RANK", f"{where}: expected rank 2, got {lhs_shape} and {rhs_shape}")
+        rows, lhs_k = lhs_shape
+        rhs_k, columns = rhs_shape
+        if lhs_k != rhs_k:
+            raise ModelError("E_SHAPE_MISMATCH", f"{where}: K mismatch for {lhs_shape} and {rhs_shape}")
+        expected_shape = (rows, columns)
+    elif len(operands) == 2 and operands[0].type != operands[1].type:
+        raise ModelError("E_BROADCAST_UNSUPPORTED", f"{where}: requires identical shapes")
+    if result_type.shape != expected_shape:
+        raise ModelError("E_SHAPE_MISMATCH", f"{where}: expected {expected_shape}, got {result_type.shape}")
     result = ValueRef(f"%v{index}", result_type)
     value_map[output_name] = result
+    ssa_operands = ", ".join(value.ssa for value in operands)
+    operand_types = ", ".join(value.type.mlir_type for value in operands)
     return (
-        f'    {result.ssa} = "mini.matmul"({lhs.ssa}, {rhs.ssa})'
-        f" : ({lhs.type.mlir_type}, {rhs.type.mlir_type}) -> {result.type.mlir_type}"
+        f'    {result.ssa} = "mini.{node.op_type.lower()}"({ssa_operands})'
+        f" : ({operand_types}) -> {result.type.mlir_type}"
     )
 
 
@@ -145,6 +199,7 @@ def import_model(model: onnx.ModelProto) -> str:
         checker.check_model(model)
     except checker.ValidationError as error:
         raise ModelError("E_INVALID_GRAPH", f"ONNX Checker: {error}") from error
+    constants = [(tensor.name, read_initializer(tensor)) for tensor in model.graph.initializer]
     try:
         inferred = shape_inference.infer_shapes(model, check_type=True, strict_mode=True)
     except shape_inference.InferenceError as error:
@@ -164,7 +219,19 @@ def import_model(model: onnx.ModelProto) -> str:
         value_map[info.name] = value
         arguments.append(f"{value.ssa}: {value.type.mlir_type}")
 
-    operations = [emit_matmul(index, node, type_map, value_map) for index, node in enumerate(graph.node)]
+    operations = []
+    for index, (name, array) in enumerate(constants):
+        if name in value_map:
+            raise ModelError("E_INVALID_GRAPH", f"duplicate definition of {name!r}")
+        value_type = TensorType(array.shape, "f32")
+        if name in type_map and get_value_type(type_map, name, "initializer") != value_type:
+            raise ModelError("E_SHAPE_MISMATCH", f"Initializer {name!r}: conflicting type annotation")
+        value = ValueRef(f"%c{index}", value_type)
+        value_map[name] = value
+        payload = format_dense(array.view(np.uint32).tolist())
+        operations.append(f"    {value.ssa} = arith.constant dense<{payload}> : {value.type.mlir_type}")
+
+    operations.extend(emit_node(index, node, type_map, value_map) for index, node in enumerate(graph.node))
     outputs = []
     for info in graph.output:
         value = lookup_value(value_map, info.name, "graph output")

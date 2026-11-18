@@ -1,6 +1,6 @@
 # Day 18 · ONNX 导入契约
 
-本页定义 Day 19–20 的 Python Importer。已实现的 Day 19 入口读取 `ModelProto`，输出可由 `mini-opt` 解析、验证的 Generic MLIR。当前只接受标准域 Opset 18、无 Initializer、正尺寸静态二维 FP32 MatMul 图，可包含多个 MatMul 和多个有序输出。下文的逐元素算子和常量属于扩展契约。[CLI](../../python/onnx_importer/README.md)、[Day 19 验收](day19-review.md)
+Day 20 的 Python Importer 读取 `ModelProto`，输出可由 `mini-opt` 解析和验证的 Mini IR。已实现下表中的 Graph IR 导入规则，支持多节点和多个有序输出。[CLI](../../python/onnx_importer/README.md)、[Day 20 验收](day20-review.md)
 
 ## 输入域与支持范围
 
@@ -29,7 +29,7 @@ Day 19 已验证 `H → %v0` 供第二个 MatMul 读取，并按 `graph.output` 
 
 只在 Graph Input 中的值是运行参数。只在 Initializer 中的 FP32 内嵌 Tensor 是固定常量，可经 `onnx.numpy_helper.to_array` 读取。首版对单个 Initializer 采用 64 KiB 的原始数据上限。Graph Input 与 Initializer 同名时 ONNX 可表达可覆盖的默认值，首版拒绝该情况。External Data、非 FP32、超限、形状与元素数不符的常量均须诊断。静态 Shape 和 FP32 的检查独立于数据读取。
 
-Dense 文本序列化须能往返保留有限 FP32 的位模式，包括负零和小数。不要依赖 NumPy 的默认字符串打印。可以使用固定宽度的浮点位编码，按形状生成嵌套 Dense 属性，再用当前 `mini-opt` 解析并比较还原的数据。特殊浮点数的算子输出另做语义测试。现有 MiniToLinalg ReLU 的有序比较对 NaN 和负零选择正零，当前 fixture 验证普通有限输入。[现有 ReLU 降级](../../lib/Conversion/MiniToLinalg.cpp#L23)
+仅接受有限 FP32 权重。Importer 用固定宽度的十六进制浮点位编码生成嵌套 Dense 属性。测试用 `mini-opt` 解析后以原始字节输出，比较每个 FP32 位模式。现有 MiniToLinalg ReLU 的有序比较对 NaN 和负零选择正零，当前 fixture 验证普通有限输入。[现有 ReLU 降级](../../lib/Conversion/MiniToLinalg.cpp#L23)
 
 | 条件 | 预期诊断 |
 | --- | --- |
@@ -39,4 +39,4 @@ Dense 文本序列化须能往返保留有限 FP32 的位模式，包括负零�
 | 可覆盖、External Data、超限或无法解码的权重 | `E_INITIALIZER_UNSUPPORTED` |
 | 未定义输入或输出、重复定义、arity 不符 | `E_INVALID_GRAPH`。若 Checker 已先发现问题，保留其诊断。 |
 
-诊断应包含模型路径、节点索引/名称、op_type、输入值及已知类型、失败约束。正例先验证两个运行时输入的 MatMul，再验证固定权重、共享 SSA 和有序返回。负例覆盖表中的每类边界。Day 19 初版遇到 Initializer 应明确拒绝，Day 20 扩展后用 Day 18 fixture 验证全部前端路径。
+诊断保留模型路径和失败条件。节点错误包含索引、名称、op_type 与输入名。Day 18 fixture 已作为 Day 20 正例验证。格式损坏可能由 ONNX Checker 先报告，例如截断的权重负载对应 `E_INVALID_GRAPH`。

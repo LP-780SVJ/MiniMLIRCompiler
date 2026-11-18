@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Day 18 weighted MatMul → ReLU ONNX fixture."""
+"""Generate reproducible ONNX fixtures and optional CPU reference outputs."""
 
 import argparse
 import hashlib
@@ -44,6 +44,57 @@ def make_fixture():
     model = shape_inference.infer_shapes(model, check_type=True, strict_mode=True)
     onnx.checker.check_model(model, full_check=True)
     return model, {"X": inputs}
+
+
+def make_weighted_fixture(name, inputs, weights, post_ops=()):
+    output_shape = [inputs.shape[0], weights.shape[1]]
+    initializers = [numpy_helper.from_array(weights, name="W")]
+    operators = ["MatMul", *post_ops]
+    nodes = []
+    previous = "X"
+    for index, op in enumerate(operators):
+        output = "Y" if index == len(operators) - 1 else f"H{index}"
+        operands = [previous]
+        if op == "MatMul":
+            operands.append("W")
+        elif op == "Add":
+            bias = np.arange(np.prod(output_shape), dtype=np.float32).reshape(output_shape) / 4
+            initializers.append(numpy_helper.from_array(bias, name="B"))
+            operands.append("B")
+        nodes.append(helper.make_node(op, operands, [output], name=f"{op.lower()}_{index}"))
+        previous = output
+    graph = helper.make_graph(
+        nodes, name,
+        [helper.make_tensor_value_info("X", TensorProto.FLOAT, inputs.shape)],
+        [helper.make_tensor_value_info("Y", TensorProto.FLOAT, output_shape)],
+        initializer=initializers,
+    )
+    return helper.make_model(
+        graph, producer_name="MiniNPUCompiler", ir_version=IR_VERSION,
+        opset_imports=[helper.make_opsetid("", OPSET)],
+    )
+
+
+def fixtures():
+    relu, feeds = make_fixture()
+    yield FIXTURE, relu, feeds, None
+    weights = numpy_helper.to_array(relu.graph.initializer[0])
+    for name, post_ops in [("weighted_matmul", ()), ("matmul_add_relu", ("Add", "Relu"))]:
+        yield name, make_weighted_fixture(name, feeds["X"], weights, post_ops), feeds, None
+
+    seed = 2026
+    rng = np.random.default_rng(seed)
+    for name in ("matmul", "matmul_chain"):
+        model = onnx.load(DEFAULT_OUTPUT / "models" / f"{name}.onnx")
+        feeds = {
+            name: rng.standard_normal(shape, dtype=np.float32)
+            for name, shape in shapes(model.graph.input).items()
+        }
+        yield name, model, feeds, seed
+    inputs = rng.standard_normal((64, 96), dtype=np.float32)
+    weights = rng.standard_normal((96, 64), dtype=np.float32)
+    name = "matmul_multitile"
+    yield name, make_weighted_fixture(name, inputs, weights), {"X": inputs}, seed
 
 
 def shapes(value_infos):
@@ -95,23 +146,29 @@ def main():
     parser.add_argument(
         "--with-reference", action="store_true", help="also run ONNX Runtime CPU"
     )
+    parser.add_argument("--all", action="store_true", help="generate the complete Day 20 suite")
     args = parser.parse_args()
+    selected = fixtures() if args.all else (next(fixtures()),)
+    for name, model, feeds, seed in selected:
+        write_fixture(name, model, feeds, seed, args.output_dir, args.with_reference)
 
-    model, feeds = make_fixture()
+
+def write_fixture(name, model, feeds, seed, output_dir, with_reference):
+    onnx.checker.check_model(model, full_check=True)
     model_bytes = model.SerializeToString(deterministic=True)
     graph = model.graph
     input_shapes = shapes(graph.input)
     output_shapes = shapes(graph.output)
-    intermediate_shapes = shapes(graph.value_info)
-    output_dir = args.output_dir
-    model_file = Path("models") / f"{FIXTURE}.onnx"
-    input_file = Path("inputs") / f"{FIXTURE}.npz"
-    reference_file = Path("reference") / f"{FIXTURE}.npz"
-    metadata_file = Path("models") / f"{FIXTURE}.metadata.json"
+    inferred = shape_inference.infer_shapes(model, check_type=True, strict_mode=True)
+    intermediate_shapes = shapes(inferred.graph.value_info)
+    model_file = Path("models") / f"{name}.onnx"
+    input_file = Path("inputs") / f"{name}.npz"
+    reference_file = Path("reference") / f"{name}.npz"
+    metadata_file = Path("models") / f"{name}.metadata.json"
 
     reference = None
     ort_version = None
-    if args.with_reference:
+    if with_reference:
         reference, ort_version = run_reference(
             model_bytes, feeds, input_shapes, output_shapes
         )
@@ -130,7 +187,7 @@ def main():
         "onnx_version": onnx.__version__,
         "numpy_version": np.__version__,
         "dtype": "float32",
-        "seed": None,
+        "seed": seed,
         "input_names": list(input_shapes),
         "output_names": list(output_shapes),
         "inputs": input_shapes,
@@ -164,14 +221,15 @@ def main():
             metadata["reference"] = old_metadata["reference"]
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
-    print(f"ONNX Checker: passed (IR {IR_VERSION}, Opset {OPSET})")
+    print(f"{name}: ONNX Checker passed (IR {IR_VERSION}, Opset {OPSET})")
     print(f"Inputs: {input_shapes}; initializers: {[w.name for w in graph.initializer]}")
     print(f"Nodes: {[node.op_type for node in graph.node]}")
     print(f"Inferred intermediate shapes: {intermediate_shapes}; outputs: {output_shapes}")
     if reference is not None:
         print(f"ONNX Runtime {ort_version} ({CPU_PROVIDER}):")
-        for name, array in reference.items():
-            print(f"{name} ({array.dtype}): {array.tolist()}")
+        for tensor_name, array in reference.items():
+            values = array.tolist() if array.size <= 16 else f"min={array.min():.6g}, max={array.max():.6g}"
+            print(f"{tensor_name} ({array.dtype}, {array.shape}): {values}")
 
 
 if __name__ == "__main__":

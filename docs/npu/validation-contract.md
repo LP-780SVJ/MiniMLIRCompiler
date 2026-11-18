@@ -23,7 +23,7 @@ ONNX Runtime CPU 使用与未来 Virtual NPU 相同的 ONNX 模型和固定输�
 | 数值执行 | Simulator 从权重和固定输入生成实际输出，再与独立参考比较。 |
 | 性能 | 单独记录 Tile 数、DMA 字节量、峰值 SRAM 等指标。 |
 
-Day 20 的比较器检查名称集合、Shape、dtype 和 NaN/Inf，再对有限 FP32 使用 `abs(actual-reference) <= atol + rtol*abs(reference)`。候选值为 `rtol=1e-4`、`atol=1e-5`。报告最大绝对误差、采用有记录分母规则的最大相对误差、不匹配元素数量和通过状态。至少验证一致、单元素错误注入、Shape/DType/名称不匹配、NaN/Inf 拒绝。常量位模式保真用独立的精确测试。
+[Day 20 比较器](../../python/e2e/compare_outputs.py) 检查名称集合、Shape、dtype 和 NaN/Inf，再对有限 FP32 使用 `abs(actual-reference) <= atol + rtol*abs(reference)`，默认 `rtol=1e-4`、`atol=1e-5`。用 FP64 统计误差；最大相对误差只统计非零参考值，零参考值仍按绝对容差判断。同位置的 NaN 或同号 Inf 匹配，其余非有限差异计入不匹配元素。JSON 含统计与通过状态。退出码 0 表示通过，1 表示输出不匹配，2 表示参数或文件错误。常量位模式保真用独立的精确测试。实测见 [Day 20 验收](day20-review.md)。
 
 ## Day 18 实际执行
 

@@ -41,10 +41,19 @@ add_test(NAME mini-matmul-diagnostics
     ${CMAKE_CURRENT_SOURCE_DIR}/matmul/diagnostics.mlir -o /dev/null)
 
 set(MINI_ONNX_PYTHON "" CACHE FILEPATH "Python interpreter with ONNX for importer tests")
+add_test(NAME npu-matmul-valid
+  COMMAND $<TARGET_FILE:mini-opt> ${CMAKE_CURRENT_SOURCE_DIR}/npu/valid.mlir -o /dev/null)
+add_test(NAME npu-matmul-diagnostics
+  COMMAND $<TARGET_FILE:mini-opt> --split-input-file --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/npu/diagnostics.mlir -o /dev/null)
 if(MINI_ONNX_PYTHON)
-  foreach(case IN ITEMS matmul-import two-matmul-import reject-unsupported)
+  foreach(case IN ITEMS matmul-import two-matmul-import weighted-import reject-unsupported)
     add_test(NAME onnx-${case}
       COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_matmul_import.py
         $<TARGET_FILE:mini-opt> ${case})
   endforeach()
+  add_test(NAME onnx-golden-artifacts
+    COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_reference.py artifacts)
+  add_test(NAME onnx-output-comparator
+    COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_reference.py comparator)
 endif()

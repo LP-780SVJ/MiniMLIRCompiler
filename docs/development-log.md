@@ -205,3 +205,13 @@ Mini IR。单节点、双节点和多输出顺序实际通过 `mini-opt` 验证�
 原有 12 项 CTest 和新增 5 项均通过。MatMul 可以表示在 Graph IR 中，
 当前 Linalg 转换仍会以非法目标操作拒绝它。详细命令、诊断和 Day 20
 的接口见 [Day 19 验收](npu/day19-review.md)。
+
+## Day 20：NPU Compute IR、权重导入与 CPU 参考
+
+通过 `MLIRNPUDialect` 在 `mini-opt` 注册并验证 `npu.matmul`。Importer 仍
+生成 Mini IR，内嵌权重通过 FP32 位模式写入 `arith.constant`，多节点复用
+同一 SSA 定义。Add/Mul 支持同形状输入，ReLU 保持输入形状。
+
+ONNX Runtime CPU 实际生成六组参考输出，使用磁盘模型与输入重跑均精确
+匹配。比较器通过数值、Shape、DType、名称与 NaN/Inf 错误注入检查。
+完整 CTest 22/22 通过，复现与诊断见 [Day 20 验收](npu/day20-review.md)。
