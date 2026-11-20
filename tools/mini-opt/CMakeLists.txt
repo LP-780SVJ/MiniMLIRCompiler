@@ -5,6 +5,7 @@ set(LIBS
   MLIRMiniToLinalg
   MLIRMiniToNPU
   MLIRNPUDialect
+  MLIRNPUTiling
   MLIRArithDialect
   MLIRFuncDialect
   MLIRLinalgDialect

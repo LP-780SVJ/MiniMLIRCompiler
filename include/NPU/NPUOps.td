@@ -19,4 +19,19 @@ def MatMulOp : Op<NPU_Dialect, "matmul", [Pure]> {
   let hasVerifier = 1;
 }
 
+def TiledMatMulOp : Op<NPU_Dialect, "tiled_matmul", [Pure]> {
+  let summary = "Full FP32 MatMul with a static Virtual NPU tile plan";
+  let arguments = (ins
+    StaticShapeTensorOf<[F32]>:$lhs,
+    StaticShapeTensorOf<[F32]>:$rhs,
+    StrAttr:$target,
+    I64Attr:$tile_m,
+    I64Attr:$tile_n,
+    I64Attr:$tile_k,
+    ArrayAttr:$tiles
+  );
+  let results = (outs StaticShapeTensorOf<[F32]>:$result);
+  let hasVerifier = 1;
+}
+
 #endif

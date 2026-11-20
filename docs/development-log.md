@@ -225,3 +225,11 @@ Dense Tensor 常量。ONNX 单节点、双节点、加权和多 Tile MatMul 都�
 
 原有 22 项及新增 3 项 CTest 均通过。构建、IR 快照和第四周交接见
 [Week 3 验收](npu/week3-review.md)。
+
+## Day 22：NPU MatMul 分块计划
+
+新增独立的 `npu-tiling` 和 `npu.tiled_matmul`。从 Virtual NPU profile
+读取原生 M/N/K 上限，用有效尺寸表示尾块，保留 Tensor 类型、权重和 SSA。
+Tile Verifier 检查完整覆盖与 K 累加边界。两组真实 ONNX 均生成并重读
+Tile IR，分别有 1 和 12 条记录。CTest **30/30 通过**。
+[验收命令与结果](npu/day22-review.md)；[Day 23 输入契约](npu/tiling-design.md)。

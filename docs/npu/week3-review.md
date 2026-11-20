@@ -2,7 +2,7 @@
 
 工作依据是 Week 3 总计划的 Day 21 章节；本地未找到单独的 `day21.md`。开发前工作区干净，HEAD 为 `6c93c8aa25c0e6f8fabb7eeb6109d4073dfeeede`，LLVM/MLIR 为 `llvmorg-23.1.4`，基线 CTest 22/22 通过。
 
-## 第三周交付
+## 第三周交付  
 
 | 内容 | 结果 |
 | --- | --- |

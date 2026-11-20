@@ -4,6 +4,7 @@
 #include "Mini/MiniNPULowering.h"
 #include "Mini/MiniPasses.h"
 #include "NPU/NPUDialect.h"
+#include "NPU/NPUTiling.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,6 +21,7 @@ int main(int argc, char **argv) {
   mlir::mini::registerMiniPasses();
   mlir::mini::registerMiniLoweringPasses();
   mlir::mini::registerMiniToNPUPass();
+  mlir::npu::registerNPUTilingPass();
   mlir::registerTransformsPasses();
   mlir::PassPipelineRegistration<>(
       "mini-compile", "Canonicalize, fuse and fully lower Mini IR",

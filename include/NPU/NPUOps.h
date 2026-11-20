@@ -2,6 +2,7 @@
 #define NPU_NPUOPS_H
 
 #include "NPU/NPUDialect.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"

@@ -49,7 +49,17 @@ add_test(NAME npu-matmul-diagnostics
 add_test(NAME mini-to-npu-conversion
   COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/npu/conversion/check-mini-to-npu.sh
     $<TARGET_FILE:mini-opt>)
+add_test(NAME npu-tile-ir-valid
+  COMMAND $<TARGET_FILE:mini-opt> ${CMAKE_CURRENT_SOURCE_DIR}/npu/tiling/valid.mlir -o /dev/null)
+add_test(NAME npu-tile-ir-diagnostics
+  COMMAND $<TARGET_FILE:mini-opt> --split-input-file --verify-diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/npu/tiling/diagnostics.mlir -o /dev/null)
 if(MINI_ONNX_PYTHON)
+  foreach(case IN ITEMS positive negative onnx)
+    add_test(NAME npu-tiling-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/tiling/check_npu_tiling.py
+        $<TARGET_FILE:mini-opt> ${case})
+  endforeach()
   foreach(case IN ITEMS matmul-import two-matmul-import weighted-import reject-unsupported)
     add_test(NAME onnx-${case}
       COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_matmul_import.py

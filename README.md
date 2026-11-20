@@ -24,6 +24,10 @@ Day 21 打通 `ONNX → Mini Graph IR → NPU Compute IR`。使用独立的
 `builtin.module(mini-npu-compile)` 流水线转换 MatMul，并保留函数签名、
 FP32 Tensor 常量和 SSA 数据依赖。运行命令见 [Week 3 验收](docs/npu/week3-review.md)。
 
+Day 22 的 `npu-tiling` 从 Virtual NPU JSON 读取原生上限，将完整 MatMul
+转换为带静态计划的 `npu.tiled_matmul`，支持 M/N/K 尾块并保留 Tensor SSA。
+见 [分块契约](docs/npu/tiling-design.md) 和 [Day 22 验收](docs/npu/day22-review.md)。
+
 ## 构建与运行
 
 在 `AI-Compiler` 根目录运行，复用已有 LLVM/MLIR 构建：
@@ -110,8 +114,8 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 
 ## 测试与当前边界
 
-Day 21 的 CTest **25/25 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
-参考数据及比较器错误注入。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
+Day 22 的 CTest **30/30 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
+Tile 计划、参考数据及比较器错误注入。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
 启用 Python 测试；未设置时可独立构建和测试 C++ 工程。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
