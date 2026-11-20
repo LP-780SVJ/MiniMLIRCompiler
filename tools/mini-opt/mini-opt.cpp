@@ -1,6 +1,7 @@
 
 #include "Mini/MiniDialect.h"
 #include "Mini/MiniLowering.h"
+#include "Mini/MiniNPULowering.h"
 #include "Mini/MiniPasses.h"
 #include "NPU/NPUDialect.h"
 
@@ -18,6 +19,7 @@
 int main(int argc, char **argv) {
   mlir::mini::registerMiniPasses();
   mlir::mini::registerMiniLoweringPasses();
+  mlir::mini::registerMiniToNPUPass();
   mlir::registerTransformsPasses();
   mlir::PassPipelineRegistration<>(
       "mini-compile", "Canonicalize, fuse and fully lower Mini IR",
@@ -28,6 +30,12 @@ int main(int argc, char **argv) {
         pm.addPass(mlir::mini::createMiniToLinalgPass());
         pm.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
+      });
+  mlir::PassPipelineRegistration<>(
+      "mini-npu-compile", "Canonicalize and lower Mini to Virtual NPU compute IR",
+      [](mlir::OpPassManager &pm) {
+        pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
+        pm.addPass(mlir::mini::createMiniToNPUPass());
       });
   mlir::DialectRegistry registry;
 

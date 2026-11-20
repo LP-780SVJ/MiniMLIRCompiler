@@ -9,12 +9,12 @@ code/MiniMLIRCompiler/build/bin/mini-opt input.mini.mlir \
   --pass-pipeline='builtin.module(mini-compile)'
 ```
 
-## Day 21 规划的 Virtual NPU 路线
+## Day 21 已实现的 Virtual NPU 路线
 
-新增独立 `mini-npu-compile`，采用 `func canonicalize → module MiniToNPU → NPU IR Verification`。解析时验证输入，保留 PassManager 验证。转换输入中的存活计算须全部进入目标允许集合。未支持计算的 Pipeline 负例应将其结果连接到返回值，避免 canonicalize 消除死代码改变测试含义。直接测试 `mini-to-npu` 则检查所有输入 Op。新 Pipeline 先不启用 AddReluFusion，因为当前 NPU 仅映射 MatMul。[Lowering 契约](lowering-contract.md)
+独立的 `mini-npu-compile` 运行 `func canonicalize → module MiniToNPU`。解析时验证输入，依靠默认的 PassManager Verifier 检查转换后 IR。转换输入中的存活计算须全部进入目标允许集合。未支持计算的 Pipeline 负例将结果连接到返回值，避免 canonicalize 消除死代码。直接运行 `mini-to-npu` 可在不做前置清理的情况下检查目标合法性。NPU Pipeline 当前仅映射 MatMul，未接入 AddReluFusion。[Lowering 契约](lowering-contract.md)
 
 ```bash
-# Day 21 规划命令
+# 直接转换可用 builtin.module(mini-to-npu)
 code/MiniMLIRCompiler/build/bin/mini-opt weighted_matmul.mini.mlir \
   --pass-pipeline='builtin.module(mini-npu-compile)' -o weighted_matmul.npu.mlir
 code/MiniMLIRCompiler/build/bin/mini-opt weighted_matmul.npu.mlir -o /dev/null

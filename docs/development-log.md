@@ -215,3 +215,13 @@ Mini IR。单节点、双节点和多输出顺序实际通过 `mini-opt` 验证�
 ONNX Runtime CPU 实际生成六组参考输出，使用磁盘模型与输入重跑均精确
 匹配。比较器通过数值、Shape、DType、名称与 NaN/Inf 错误注入检查。
 完整 CTest 22/22 通过，复现与诊断见 [Day 20 验收](npu/day20-review.md)。
+
+## Day 21：MiniToNPU 与第三周集成
+
+新增 `mini-to-npu` 和独立的 `mini-npu-compile`。模块级完整转换负责将
+Mini MatMul 替换为 NPU MatMul，检查目标操作集合，并只保留静态 FP32
+Dense Tensor 常量。ONNX 单节点、双节点、加权和多 Tile MatMul 都完成导入、
+转换和重新解析，权重逐位一致。存活的 Add 和 ReLU 明确失败。
+
+原有 22 项及新增 3 项 CTest 均通过。构建、IR 快照和第四周交接见
+[Week 3 验收](npu/week3-review.md)。

@@ -46,6 +46,9 @@ add_test(NAME npu-matmul-valid
 add_test(NAME npu-matmul-diagnostics
   COMMAND $<TARGET_FILE:mini-opt> --split-input-file --verify-diagnostics
     ${CMAKE_CURRENT_SOURCE_DIR}/npu/diagnostics.mlir -o /dev/null)
+add_test(NAME mini-to-npu-conversion
+  COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/npu/conversion/check-mini-to-npu.sh
+    $<TARGET_FILE:mini-opt>)
 if(MINI_ONNX_PYTHON)
   foreach(case IN ITEMS matmul-import two-matmul-import weighted-import reject-unsupported)
     add_test(NAME onnx-${case}
@@ -56,4 +59,9 @@ if(MINI_ONNX_PYTHON)
     COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_reference.py artifacts)
   add_test(NAME onnx-output-comparator
     COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_reference.py comparator)
+  foreach(case IN ITEMS positive negative)
+    add_test(NAME onnx-to-npu-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_onnx_to_npu_ir.py
+        $<TARGET_FILE:mini-opt> ${case})
+  endforeach()
 endif()

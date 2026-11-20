@@ -6,11 +6,11 @@
 
 [MiniToLinalg.cpp](../../lib/Conversion/MiniToLinalg.cpp#L157) 使用 `ConversionTarget` 与 `applyFullConversion`，标记 Mini Dialect 非法，为 Add、Mul、ReLU 和 AddReLU 注册 Pattern，输出标准 Tensor、Linalg 和 Arith 等 IR。Day 19 新增 `mini.matmul` 后，仍需另写对应的 Linalg Pattern 才能用原 Pipeline 转换它。未来的 Coral 桥接应以 `tensor.empty → linalg.fill(0) → linalg.matmul` 初始化累加目标。empty 提供类型和形状，fill 提供 MatMul 读取的初始值。
 
-## Day 21 的 MiniToNPU
+## Day 21 已实现的 MiniToNPU
 
-- **接口。** Module 级 Pass 名为 `mini-to-npu`。首版只注册 `OpConversionPattern<mini::MatMulOp>`，目标计算 Op 为 `npu.matmul`。
+- **接口。** [MiniToNPU.cpp](../../lib/Conversion/MiniToNPU.cpp) 实现 Module 级 Pass `mini-to-npu`。首版只注册 `OpConversionPattern<mini::MatMulOp>`，目标计算 Op 为 `npu.matmul`。
 - **类型与 SSA。** 用 Pattern adaptor 提供的操作数、原结果类型和位置创建目标 Op，通过 rewriter 替换原结果的全部使用。保留计算语义、Shape、常量引用及函数签名。计算层使用同一 Tensor 类型，首版无需 TypeConverter。
-- **合法性。** 明确允许 `builtin.module`、`func.func`、`func.return`、`npu.matmul` 和静态 FP32 Dense Tensor `arith.constant`。常量形态可用动态合法性检查。模块和函数体须可遍历。Mini Dialect 标为非法，其余未列出的操作无法取得合法性。首版没有 CPU fallback。`func.call` 和其他 Arith 运算不在允许集合。
+- **合法性。** 明确允许 `builtin.module`、`func.func`、`func.return`、`npu.matmul` 和静态 FP32 Dense Tensor `arith.constant`。只给符合条件的常量实例赋予动态合法性，仍遍历模块和函数体。Mini Dialect 标为非法，其余未列出的操作无法取得合法性。首版没有 CPU fallback。`func.call` 和其他 Arith 运算不在允许集合。
 - **失败。** `applyFullConversion` 失败时 `signalPassFailure()`，驱动返回非零，诊断定位未转换的源 Op。转换成功后用 Verifier 及重新解析确认 Type/Shape/SSA。[MLIR Dialect Conversion](https://mlir.llvm.org/docs/DialectConversion/)
 
 | 测试 | 预期 |
