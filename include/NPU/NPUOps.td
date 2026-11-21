@@ -50,4 +50,25 @@ def SRAMPlannedMatMulOp : Op<NPU_Dialect, "sram_planned_matmul", [Pure]> {
   let hasVerifier = 1;
 }
 
+def CommandMatMulOp : Op<NPU_Dialect, "command_matmul",
+                         [MemoryEffects<[MemRead, MemWrite]>]> {
+  let summary = "MatMul with explicit Virtual NPU memory and compute commands";
+  let arguments = (ins
+    StaticShapeTensorOf<[F32]>:$lhs,
+    StaticShapeTensorOf<[F32]>:$rhs,
+    StrAttr:$target,
+    I64Attr:$tile_m,
+    I64Attr:$tile_n,
+    I64Attr:$tile_k,
+    ArrayAttr:$tiles,
+    DictionaryAttr:$memory_plan,
+    I64Attr:$lhs_tensor_id,
+    I64Attr:$rhs_tensor_id,
+    I64Attr:$result_tensor_id,
+    ArrayAttr:$commands
+  );
+  let results = (outs StaticShapeTensorOf<[F32]>:$result);
+  let hasVerifier = 1;
+}
+
 #endif

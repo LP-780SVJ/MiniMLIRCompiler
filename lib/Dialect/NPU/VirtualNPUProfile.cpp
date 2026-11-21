@@ -58,3 +58,35 @@ mlir::npu::readNativeLimits(const llvm::json::Object &profile) {
   }
   return limits;
 }
+
+llvm::Expected<SRAMConfig>
+mlir::npu::readSRAMConfig(const llvm::json::Object &profile) {
+  const auto *memory = profile.getObject("memory");
+  if (!memory)
+    return llvm::createStringError("missing memory object");
+  if (memory->getString("layout") != "row_major")
+    return llvm::createStringError("expected row_major SRAM layout");
+  const auto *dma = profile.getObject("dma");
+  if (!dma || dma->getString("mode") != "synchronous" ||
+      dma->getString("buffering") != "single")
+    return llvm::createStringError("expected synchronous DMA with single buffering");
+
+  auto readBytes = [memory](StringRef name) -> std::optional<int64_t> {
+    const auto *field = memory->get(name);
+    auto value = field ? field->getAsUINT64() : std::nullopt;
+    if (!value || *value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
+      return std::nullopt;
+    return static_cast<int64_t>(*value);
+  };
+  auto capacity = readBytes("sram_bytes");
+  auto reserved = readBytes("reserved_bytes");
+  auto alignment = readBytes("alignment_bytes");
+  if (!capacity || !reserved || !alignment)
+    return llvm::createStringError(
+        "memory.sram_bytes, reserved_bytes and alignment_bytes must be nonnegative i64 integers");
+
+  SRAMConfig config{*capacity, *reserved, *alignment};
+  if (auto error = verifySRAMConfig(config))
+    return error;
+  return config;
+}

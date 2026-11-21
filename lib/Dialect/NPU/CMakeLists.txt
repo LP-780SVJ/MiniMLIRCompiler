@@ -6,6 +6,9 @@ add_mlir_dialect_library(MLIRNPUDialect
   MemoryPlan.cpp
   MemoryPlanAttrs.cpp
   VirtualNPUProfile.cpp
+  DRAMLayout.cpp
+  CommandPlan.cpp
+  CommandPlanAttrs.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/NPU
@@ -15,5 +18,7 @@ add_mlir_dialect_library(MLIRNPUDialect
 
   LINK_LIBS PUBLIC
   MLIRIR
+  MLIRArithDialect
+  MLIRFuncDialect
   MLIRSideEffectInterfaces
 )

@@ -1,8 +1,10 @@
 #include "NPU/NPUOps.h"
+#include "NPU/CommandPlanAttrs.h"
 #include "NPU/MemoryPlanAttrs.h"
 #include "NPU/TilePlanAttrs.h"
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -103,6 +105,47 @@ LogicalResult SRAMPlannedMatMulOp::verify() {
   if (!plan)
     return emitOpError() << llvm::toString(plan.takeError());
   if (auto error = verifyMemoryPlan(tiles, *plan))
+    return emitOpError() << llvm::toString(std::move(error));
+  return success();
+}
+
+LogicalResult CommandMatMulOp::verify() {
+  SmallVector<TileDesc> tiles;
+  if (failed(verifyTilePlan(*this, &tiles)))
+    return failure();
+  auto memory = decodeMemoryPlan(getMemoryPlan());
+  if (!memory)
+    return emitOpError() << llvm::toString(memory.takeError());
+  if (auto error = verifyMemoryPlan(tiles, *memory))
+    return emitOpError() << llvm::toString(std::move(error));
+  auto module = getOperation()->getParentOfType<ModuleOp>();
+  auto layout = module ? module->getAttrOfType<DictionaryAttr>(dramLayoutAttr)
+                       : DictionaryAttr{};
+  if (!layout)
+    return emitOpError("requires a module DRAM layout (npu.dram_layout)");
+  auto descriptors = dyn_cast_or_null<ArrayAttr>(layout.get("tensors"));
+  if (!descriptors)
+    return emitOpError("requires a DRAM tensor descriptor array");
+
+  MatMulTensors tensors;
+  const int64_t ids[] = {getLhsTensorIdAttr().getInt(),
+                         getRhsTensorIdAttr().getInt(),
+                         getResultTensorIdAttr().getInt()};
+  for (auto [index, id] : llvm::enumerate(ids)) {
+    if (id < 0 || static_cast<uint64_t>(id) >= descriptors.size())
+      return emitOpError() << "unknown DRAM tensor ID " << id;
+    auto dict = dyn_cast<DictionaryAttr>(descriptors[id]);
+    if (!dict)
+      return emitOpError("DRAM tensor descriptor must be a dictionary");
+    auto desc = decodeDRAMTensorDesc(dict);
+    if (!desc)
+      return emitOpError() << llvm::toString(desc.takeError());
+    tensors[index] = *desc;
+  }
+  auto commands = decodeCommands(getCommands());
+  if (!commands)
+    return emitOpError() << llvm::toString(commands.takeError());
+  if (auto error = verifyCommands(tiles, *memory, tensors, *commands))
     return emitOpError() << llvm::toString(std::move(error));
   return success();
 }

@@ -242,3 +242,11 @@ Tile IR，分别有 1 和 12 条记录。CTest **30/30 通过**。
 两组实际峰值分别为 192 B 和 12 KiB，原权重与 SSA 保持。
 完整 CTest 34/34 通过。见 [Day 23 验收](npu/day23-review.md) 和
 [Day 24 的输入契约](npu/sram-planning.md)。
+
+## Day 24：DRAM Layout 与 DMA 命令
+
+新增 `npu-insert-dma`、`npu.dram_layout` 和 `npu.command_matmul`。
+完整 Tensor 的 DRAM 区间按 SSA 值分配，局部命令按 SRAM Binding 查找地址，
+生成双 stride 的二维搬运。两个模型实测分别生成 5 / 44 条命令，
+有效 DMA 数据为 104 B / 112 KiB。权重与 SSA 保持，CTest 38/38 通过。
+见 [Day 24 验收](npu/day24-review.md) 和 [命令契约](npu/dma-contract.md)。

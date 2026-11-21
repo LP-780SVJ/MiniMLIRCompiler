@@ -4,6 +4,7 @@
 #include "Mini/MiniNPULowering.h"
 #include "Mini/MiniPasses.h"
 #include "NPU/NPUDialect.h"
+#include "NPU/DMAInsertion.h"
 #include "NPU/NPUTiling.h"
 #include "NPU/SRAMPlanner.h"
 
@@ -24,6 +25,7 @@ int main(int argc, char **argv) {
   mlir::mini::registerMiniToNPUPass();
   mlir::npu::registerNPUTilingPass();
   mlir::npu::registerSRAMPlannerPass();
+  mlir::npu::registerDMAInsertionPass();
   mlir::registerTransformsPasses();
   mlir::PassPipelineRegistration<>(
       "mini-compile", "Canonicalize, fuse and fully lower Mini IR",

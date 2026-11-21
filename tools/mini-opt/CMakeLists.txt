@@ -7,6 +7,7 @@ set(LIBS
   MLIRNPUDialect
   MLIRNPUTiling
   MLIRNPUSRAMPlanner
+  MLIRNPUDMAInsertion
   MLIRArithDialect
   MLIRFuncDialect
   MLIRLinalgDialect

@@ -60,7 +60,17 @@ llvm_update_compile_flags(mini-sram-plan-test)
 target_link_libraries(mini-sram-plan-test PRIVATE MLIRNPUDialect)
 add_test(NAME npu-sram-allocation COMMAND $<TARGET_FILE:mini-sram-plan-test>)
 
+add_executable(mini-command-plan-test npu/dma/CommandPlanTest.cpp)
+llvm_update_compile_flags(mini-command-plan-test)
+target_link_libraries(mini-command-plan-test PRIVATE MLIRNPUDialect)
+add_test(NAME npu-dma-address-arithmetic COMMAND $<TARGET_FILE:mini-command-plan-test>)
+
 if(MINI_ONNX_PYTHON)
+  foreach(case IN ITEMS positive negative onnx)
+    add_test(NAME npu-dma-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/dma/check_dma_insertion.py
+        $<TARGET_FILE:mini-opt> ${case})
+  endforeach()
   foreach(case IN ITEMS positive negative onnx)
     add_test(NAME npu-sram-${case}
       COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/sram/check_sram_plan.py

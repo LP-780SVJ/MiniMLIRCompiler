@@ -21,3 +21,13 @@ add_mlir_library(MLIRNPUSRAMPlanner
   MLIRIR
   MLIRPass
 )
+
+add_mlir_library(MLIRNPUDMAInsertion
+  DMAInsertion.cpp
+  PARTIAL_SOURCES_INTENDED
+
+  LINK_LIBS PUBLIC
+  MLIRNPUDialect
+  MLIRIR
+  MLIRPass
+)
