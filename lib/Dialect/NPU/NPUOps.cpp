@@ -1,9 +1,12 @@
 #include "NPU/NPUOps.h"
+#include "NPU/MemoryPlanAttrs.h"
 #include "NPU/TilePlanAttrs.h"
 
 #include "mlir/IR/Builders.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
+
+#include <utility>
 
 using namespace mlir;
 using namespace mlir::npu;
@@ -32,6 +35,57 @@ LogicalResult verifyMatMulTypes(Operation *op, RankedTensorType lhs,
   return success();
 }
 
+template <typename MatMul>
+LogicalResult verifyTilePlan(MatMul op,
+                             SmallVectorImpl<TileDesc> *decoded = nullptr) {
+  auto lhs = op.getLhs().getType();
+  auto rhs = op.getRhs().getType();
+  if (failed(verifyMatMulTypes(op.getOperation(), lhs, rhs,
+                               op.getResult().getType())))
+    return failure();
+  if (op.getTarget() != virtualNPUTarget)
+    return op.emitOpError() << "unsupported tile plan target " << op.getTarget();
+
+  auto plan = TilePlan::create(
+      {lhs.getDimSize(0), rhs.getDimSize(1), lhs.getDimSize(1)},
+      {op.getTileMAttr().getInt(), op.getTileNAttr().getInt(),
+       op.getTileKAttr().getInt()});
+  if (!plan)
+    return op.emitOpError() << llvm::toString(plan.takeError());
+  if (op.getTiles().size() != static_cast<size_t>(plan->size()))
+    return op.emitOpError() << "expected " << plan->size() << " tile records, got "
+                            << op.getTiles().size();
+
+  for (auto [index, entry] : llvm::enumerate(op.getTiles())) {
+    auto dict = dyn_cast<DictionaryAttr>(entry);
+    if (!dict)
+      return op.emitOpError() << "tile #" << index << " must be a dictionary";
+    auto tile = decodeTileDesc(dict);
+    if (!tile)
+      return op.emitOpError() << "tile #" << index << ": "
+                              << llvm::toString(tile.takeError());
+    TileDesc expected = plan->getTile(index);
+    if (tile->mOffset != expected.mOffset || tile->nOffset != expected.nOffset ||
+        tile->kOffset != expected.kOffset || tile->mSize != expected.mSize ||
+        tile->nSize != expected.nSize || tile->kSize != expected.kSize)
+      return op.emitOpError() << "tile #" << index << " must have offset ("
+                              << expected.mOffset << ", " << expected.nOffset
+                              << ", " << expected.kOffset << ") and size ("
+                              << expected.mSize << ", " << expected.nSize
+                              << ", " << expected.kSize
+                              << ") for full M/N/K coverage";
+    if (tile->outputTileId != expected.outputTileId)
+      return op.emitOpError() << "tile #" << index << " requires output_tile_id "
+                              << expected.outputTileId;
+    if (tile->isFirstK != expected.isFirstK || tile->isLastK != expected.isLastK)
+      return op.emitOpError() << "tile #" << index
+                              << " has incorrect is_first_k / is_last_k flags";
+    if (decoded)
+      decoded->push_back(*tile);
+  }
+  return success();
+}
+
 }
 
 LogicalResult MatMulOp::verify() {
@@ -39,47 +93,17 @@ LogicalResult MatMulOp::verify() {
                            getRhs().getType(), getResult().getType());
 }
 
-LogicalResult TiledMatMulOp::verify() {
-  auto lhs = getLhs().getType();
-  auto rhs = getRhs().getType();
-  if (failed(verifyMatMulTypes(getOperation(), lhs, rhs, getResult().getType())))
-    return failure();
-  if (getTarget() != virtualNPUTarget)
-    return emitOpError() << "unsupported tile plan target " << getTarget();
+LogicalResult TiledMatMulOp::verify() { return verifyTilePlan(*this); }
 
-  auto plan = TilePlan::create(
-      {lhs.getDimSize(0), rhs.getDimSize(1), lhs.getDimSize(1)},
-      {getTileMAttr().getInt(), getTileNAttr().getInt(), getTileKAttr().getInt()});
+LogicalResult SRAMPlannedMatMulOp::verify() {
+  SmallVector<TileDesc> tiles;
+  if (failed(verifyTilePlan(*this, &tiles)))
+    return failure();
+  auto plan = decodeMemoryPlan(getMemoryPlan());
   if (!plan)
     return emitOpError() << llvm::toString(plan.takeError());
-  if (getTiles().size() != static_cast<size_t>(plan->size()))
-    return emitOpError() << "expected " << plan->size() << " tile records, got "
-                         << getTiles().size();
-
-  for (auto [index, entry] : llvm::enumerate(getTiles())) {
-    auto dict = dyn_cast<DictionaryAttr>(entry);
-    if (!dict)
-      return emitOpError() << "tile #" << index << " must be a dictionary";
-    auto tile = decodeTileDesc(dict);
-    if (!tile)
-      return emitOpError() << "tile #" << index << ": "
-                           << llvm::toString(tile.takeError());
-    TileDesc expected = plan->getTile(index);
-    if (tile->mOffset != expected.mOffset || tile->nOffset != expected.nOffset ||
-        tile->kOffset != expected.kOffset || tile->mSize != expected.mSize ||
-        tile->nSize != expected.nSize || tile->kSize != expected.kSize)
-      return emitOpError() << "tile #" << index << " must have offset ("
-                           << expected.mOffset << ", " << expected.nOffset << ", "
-                           << expected.kOffset << ") and size (" << expected.mSize
-                           << ", " << expected.nSize << ", " << expected.kSize
-                           << ") for full M/N/K coverage";
-    if (tile->outputTileId != expected.outputTileId)
-      return emitOpError() << "tile #" << index << " requires output_tile_id "
-                           << expected.outputTileId;
-    if (tile->isFirstK != expected.isFirstK || tile->isLastK != expected.isLastK)
-      return emitOpError() << "tile #" << index
-                           << " has incorrect is_first_k / is_last_k flags";
-  }
+  if (auto error = verifyMemoryPlan(tiles, *plan))
+    return emitOpError() << llvm::toString(std::move(error));
   return success();
 }
 

@@ -3,6 +3,9 @@ add_mlir_dialect_library(MLIRNPUDialect
   NPUOps.cpp
   TilePlan.cpp
   TilePlanAttrs.cpp
+  MemoryPlan.cpp
+  MemoryPlanAttrs.cpp
+  VirtualNPUProfile.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/NPU

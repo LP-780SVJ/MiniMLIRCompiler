@@ -54,7 +54,18 @@ add_test(NAME npu-tile-ir-valid
 add_test(NAME npu-tile-ir-diagnostics
   COMMAND $<TARGET_FILE:mini-opt> --split-input-file --verify-diagnostics
     ${CMAKE_CURRENT_SOURCE_DIR}/npu/tiling/diagnostics.mlir -o /dev/null)
+
+add_executable(mini-sram-plan-test npu/sram/MemoryPlanTest.cpp)
+llvm_update_compile_flags(mini-sram-plan-test)
+target_link_libraries(mini-sram-plan-test PRIVATE MLIRNPUDialect)
+add_test(NAME npu-sram-allocation COMMAND $<TARGET_FILE:mini-sram-plan-test>)
+
 if(MINI_ONNX_PYTHON)
+  foreach(case IN ITEMS positive negative onnx)
+    add_test(NAME npu-sram-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/sram/check_sram_plan.py
+        $<TARGET_FILE:mini-opt> ${case})
+  endforeach()
   foreach(case IN ITEMS positive negative onnx)
     add_test(NAME npu-tiling-${case}
       COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/tiling/check_npu_tiling.py

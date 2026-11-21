@@ -27,6 +27,8 @@
 
 ## Day 23 的输入
 
+实现和产物见 [SRAM Memory Plan 契约](sram-planning.md)。
+
 1. 读取经过验证的 `npu.tiled_matmul`，检查实际 profile 的目标和原生上限与 Op 一致；`memory` 配置由 SRAM Planner 读取。
 2. 从 `getTiles()` 取得记录，用 `decodeTileDesc` 解码。维持每个 Op 内部的 M→N→K 顺序；用生产者 Op 或稳定的计算标识加 `output_tile_id` 区分累加器。
 3. 根据有效 `Mt,Nt,Kt` 用安全整数运算求原始 Buffer 字节数：A 为 `4*Mt*Kt`，B 为 `4*Kt*Nt`，C 为 `4*Mt*Nt`。一个满块三个 Buffer 各 4096 B。地址对齐、预留区和峰值容量由 Day 23 决定。

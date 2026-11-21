@@ -233,3 +233,12 @@ Dense Tensor 常量。ONNX 单节点、双节点、加权和多 Tile MatMul 都�
 Tile Verifier 检查完整覆盖与 K 累加边界。两组真实 ONNX 均生成并重读
 Tile IR，分别有 1 和 12 条记录。CTest **30/30 通过**。
 [验收命令与结果](npu/day22-review.md)；[Day 23 输入契约](npu/tiling-design.md)。
+
+## Day 23：SRAM 分配与 Buffer 生命周期
+
+新增 `npu-sram-plan` 与 `npu.sram_planned_matmul`。按同步、串行事件
+推导 A/B/C 的半开活跃区间，通过 First-Fit 分配地址。独立 Verifier
+检查绑定、尺寸、范围、对齐和时间与地址的重叠。Weighted 和 Multi-Tile
+两组实际峰值分别为 192 B 和 12 KiB，原权重与 SSA 保持。
+完整 CTest 34/34 通过。见 [Day 23 验收](npu/day23-review.md) 和
+[Day 24 的输入契约](npu/sram-planning.md)。

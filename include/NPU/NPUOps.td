@@ -34,4 +34,20 @@ def TiledMatMulOp : Op<NPU_Dialect, "tiled_matmul", [Pure]> {
   let hasVerifier = 1;
 }
 
+def SRAMPlannedMatMulOp : Op<NPU_Dialect, "sram_planned_matmul", [Pure]> {
+  let summary = "Full FP32 MatMul with verified Tile and SRAM plans";
+  let arguments = (ins
+    StaticShapeTensorOf<[F32]>:$lhs,
+    StaticShapeTensorOf<[F32]>:$rhs,
+    StrAttr:$target,
+    I64Attr:$tile_m,
+    I64Attr:$tile_n,
+    I64Attr:$tile_k,
+    ArrayAttr:$tiles,
+    DictionaryAttr:$memory_plan
+  );
+  let results = (outs StaticShapeTensorOf<[F32]>:$result);
+  let hasVerifier = 1;
+}
+
 #endif

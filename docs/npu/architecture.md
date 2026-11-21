@@ -11,7 +11,8 @@ flowchart LR
     Mini --> NPU[MiniToNPU]
     NPU --> Compute[NPU Compute IR]
     Compute --> Tile[Tile Plan IR]
-    Tile --> Command[SRAM / DMA / Command IR]
+    Tile --> SRAM[SRAM Memory Plan IR]
+    SRAM --> Command[DMA / Command IR]
     Command --> ISA[Virtual ISA]
     ISA --> Sim[Simulator]
     Sim --> Compare[数值比较]
@@ -32,7 +33,8 @@ Importer 保留模型语义、函数签名和 SSA。Graph IR 可以使用现有 
 | Contract | [IR 分层](ir-levels.md)、[Lowering](lowering-contract.md) 和 [两条 Pass Pipeline](pass-pipeline.md) 接口。 |
 | Implemented | [MiniToNPU](../../lib/Conversion/MiniToNPU.cpp) 与 `mini-npu-compile`，支持真实 ONNX MatMul 到 NPU Compute IR。[Week 3 验收](week3-review.md) |
 | Implemented | [Day 22 Tiling](tiling-design.md)：`npu-tiling` 将完整 NPU MatMul 规划为原生块与有效尾块，产出可重读的 `npu.tiled_matmul`。 |
-| Planned | SRAM、DMA、Command IR、Virtual ISA 与 Simulator。 |
+| Implemented | [Day 23 SRAM Planning](sram-planning.md)：按生命周期分配、复用和验证地址，产出 `npu.sram_planned_matmul`。 |
+| Planned | DMA、Command IR、Virtual ISA 与 Simulator。 |
 | Unsupported | 第一版动态 Shape、Batch MatMul、广播、控制流、自定义域与 External Data。NPU Compute 首版只接收 MatMul 计算。 |
 | Experimental | Coral 独立 MPACT G1 已通过。G2、G3 待验证。[Day 17 环境报告](coral/environment-report.md) |
 
@@ -43,4 +45,4 @@ Day 15 的 TVM 子图 Adapter 保留为前端扩展设计。方案 C 用可保�
 1. Day 19 的第一个正例使用两个外部 FP32 输入的 ONNX MatMul，验证参数、Shape 和结果 SSA。当前加权 MatMul→ReLU fixture 用于较完整的前端路径。
 2. Day 20 已导入该 fixture，函数只有 `X` 一个参数，`W` 进入常量，ReLU 使用 MatMul 结果。另备有 `weighted_matmul.onnx` 用于 Day 21 转换正例。
 3. Day 21 加权 MatMul 已通过完整转换，保留常量并产生 `npu.matmul`。MatMul→ReLU fixture 通过导入后，其存活的 ReLU 触发目标合法化失败。两条路径均已执行测试。
-4. Day 22 已验证加权 MatMul 和多块模型的 Tile 计划；后续阶段完成执行后，再把同一输入的实际结果与黄金输出比较。G2/G3 不参与自研主线验收。
+4. Day 22 和 Day 23 已验证加权 MatMul 和多块模型的 Tile 计划与 SRAM 计划；后续阶段完成执行后，再把同一输入的实际结果与黄金输出比较。G2/G3 不参与自研主线验收。

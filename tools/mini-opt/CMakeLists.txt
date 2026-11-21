@@ -6,6 +6,7 @@ set(LIBS
   MLIRMiniToNPU
   MLIRNPUDialect
   MLIRNPUTiling
+  MLIRNPUSRAMPlanner
   MLIRArithDialect
   MLIRFuncDialect
   MLIRLinalgDialect
