@@ -258,3 +258,14 @@ Tile IR，分别有 1 和 12 条记录。CTest **30/30 通过**。
 5 / 44 条调度记录和 4 / 93 条直接依赖，原始命令与权重保持。
 完整 CTest 42/42 通过。见 [Day 25 验收](npu/day25-review.md)
 和 [Day 26 输入契约](npu/scheduling-contract.md)。
+
+## Day 26：Virtual ISA 与程序打包
+
+新增 `mini-npu-codegen`，用已验证的全局 Sequence 将原命令编码为
+Virtual ISA v1，按 FP32 原始位模式对齐打包权重，再通过 Manifest
+暴露目标、DRAM、I/O 和文件摘要。独立加载器重读验证三份文件后发布。
+
+Weighted 和 Multi-Tile 程序包实测为 5 / 44 条指令、48 / 24,576 B
+权重，分别保持 104 B / 112 KiB 的 DMA 搬运量。完整 CTest 46/46 通过。
+见 [ISA](npu/isa-spec.md)、[Day 27 加载契约](npu/program-abi.md)
+和 [Day 26 验收](npu/day26-review.md)。

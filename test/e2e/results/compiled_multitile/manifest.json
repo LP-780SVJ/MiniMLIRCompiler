@@ -1,0 +1,89 @@
+{
+  "byte_order": "little",
+  "dtype": "float32",
+  "entry": "main",
+  "hardware": {
+    "dram_alignment_bytes": 64,
+    "dram_bytes": 65536,
+    "native_tile": [
+      32,
+      32,
+      32
+    ],
+    "reserved_bytes": 0,
+    "sram_alignment_bytes": 64,
+    "sram_bytes": 262144
+  },
+  "inputs": [
+    {
+      "name": "X",
+      "tensor_id": 0
+    }
+  ],
+  "layout": "row_major",
+  "outputs": [
+    {
+      "name": "Y",
+      "tensor_id": 2
+    }
+  ],
+  "program": {
+    "file": "program.json",
+    "instruction_count": 44,
+    "sha256": "0c5cae6038d7f78cb503bf1b1aa0faa87d26e542afe2f47633b07fedac7ec7a2",
+    "size_bytes": 18571
+  },
+  "program_schema_version": 1,
+  "schedule_contract": "serial-mnk-single-buffer-v1",
+  "schema_version": 1,
+  "target": "virtual-npu-v1",
+  "target_profile_sha256": "86fc96185eebf9fb38506b80cfe0188538dc39329cbd933e8b3f6e11a5a16f9a",
+  "tensors": [
+    {
+      "base": 0,
+      "id": 0,
+      "kind": "input",
+      "row_stride_bytes": 384,
+      "shape": [
+        64,
+        96
+      ],
+      "size_bytes": 24576
+    },
+    {
+      "base": 24576,
+      "id": 1,
+      "kind": "constant",
+      "row_stride_bytes": 256,
+      "shape": [
+        96,
+        64
+      ],
+      "size_bytes": 24576
+    },
+    {
+      "base": 49152,
+      "id": 2,
+      "kind": "output",
+      "row_stride_bytes": 256,
+      "shape": [
+        64,
+        64
+      ],
+      "size_bytes": 16384
+    }
+  ],
+  "weights": {
+    "entries": [
+      {
+        "dram_base": 24576,
+        "file_offset": 0,
+        "size_bytes": 24576,
+        "tensor_id": 1
+      }
+    ],
+    "file": "weights.bin",
+    "sha256": "ef1a2210d721fabd952767b51f6b470700d2d3814cf947e73d7379e8aa3db693",
+    "size_bytes": 24576
+  }
+}

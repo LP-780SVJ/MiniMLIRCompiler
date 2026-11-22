@@ -41,6 +41,11 @@ Day 25 的 `npu-schedule` 为原命令建立全局执行顺序和依赖，检查
 地址复用、K 累加和跨 MatMul 的完整写回。见 [调度契约](docs/npu/scheduling-contract.md)
 和 [Day 25 验收](docs/npu/day25-review.md)。
 
+Day 26 的 `mini-npu-codegen` 将已验证的 Scheduled MLIR 导出为
+`program.json`、`weights.bin` 和 `manifest.json`。程序包可由独立的
+Python 标准库加载器验证。见 [Virtual ISA v1](docs/npu/isa-spec.md)、
+[程序 ABI](docs/npu/program-abi.md) 和 [Day 26 验收](docs/npu/day26-review.md)。
+
 ## 构建与运行
 
 在 `AI-Compiler` 根目录运行，复用已有 LLVM/MLIR 构建：
@@ -50,8 +55,7 @@ cmake -S code/MiniMLIRCompiler -B code/MiniMLIRCompiler/build -G Ninja \
   -DMLIR_DIR="$PWD/llvm-project/build/lib/cmake/mlir" \
   -DLLVM_DIR="$PWD/llvm-project/build/lib/cmake/llvm" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build code/MiniMLIRCompiler/build \
-  --target mini-opt mini-sram-plan-test mini-command-plan-test mini-schedule-state-test -j 6
+cmake --build code/MiniMLIRCompiler/build -j 6
 ctest --test-dir code/MiniMLIRCompiler/build --output-on-failure
 ```
 
@@ -128,15 +132,16 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 
 ## 测试与当前边界
 
-Day 25 的 CTest **42/42 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
-Tile 与 SRAM 计划、DMA 命令、全局调度、参考数据及错误注入。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
-启用 Python 测试；未设置时可独立构建和测试 C++ 工程。
+Day 26 的 CTest **46/46 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
+Tile 与 SRAM 计划、DMA 命令、全局调度、参考数据及程序包。CodeGen 和独立
+加载测试使用 Python 3 标准库。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
+启用使用 ONNX 工具链的回归测试。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
 可融合与不可融合的计算图、SSA 结果连接、输出重新解析、重复运行、
 不支持的 Mini Operation 与非法 Shape。逐日构建和排错记录见
 `docs/development-log.md`。
 
-目前输出是标准 Tensor/Linalg/Arith IR；尚未进行 Bufferization、循环
-降级、LLVM Lowering 或 CPU 数值执行。结构测试不等于数值等价或性能
-验证。
+CPU 路径输出标准 Tensor/Linalg/Arith IR，Bufferization、循环降级及
+CPU 执行尚待实现。Virtual NPU 路径输出独立程序包，Simulator 执行与
+数值对照将在后续阶段实现。

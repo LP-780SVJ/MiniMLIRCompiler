@@ -7,6 +7,7 @@
 namespace mlir::npu {
 
 llvm::Expected<llvm::json::Object> loadTargetProfile(llvm::StringRef path);
+llvm::Expected<llvm::json::Object> parseTargetProfile(llvm::StringRef contents);
 llvm::Expected<TileShape> readNativeLimits(const llvm::json::Object &profile);
 llvm::Expected<SRAMConfig> readSRAMConfig(const llvm::json::Object &profile);
 

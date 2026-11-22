@@ -16,7 +16,12 @@ llvm::Expected<llvm::json::Object> mlir::npu::loadTargetProfile(StringRef path) 
   if (!buffer)
     return llvm::createStringError("cannot read target config: %s",
                                    buffer.getError().message().c_str());
-  auto parsed = llvm::json::parse((*buffer)->getBuffer());
+  return parseTargetProfile((*buffer)->getBuffer());
+}
+
+llvm::Expected<llvm::json::Object>
+mlir::npu::parseTargetProfile(StringRef contents) {
+  auto parsed = llvm::json::parse(contents);
   if (!parsed)
     return parsed.takeError();
   auto *profile = parsed->getAsObject();

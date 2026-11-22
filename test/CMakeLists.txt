@@ -70,6 +70,20 @@ llvm_update_compile_flags(mini-schedule-state-test)
 target_link_libraries(mini-schedule-state-test PRIVATE MLIRNPUDialect)
 add_test(NAME npu-schedule-state COMMAND $<TARGET_FILE:mini-schedule-state-test>)
 
+add_executable(mini-weight-packing-test npu/codegen/WeightPackingTest.cpp)
+llvm_update_compile_flags(mini-weight-packing-test)
+target_link_libraries(mini-weight-packing-test PRIVATE MLIRNPUCodeGen MLIRParser)
+add_test(NAME mini-weight-packing-test COMMAND $<TARGET_FILE:mini-weight-packing-test>)
+
+find_package(Python3 3.10 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  foreach(case IN ITEMS e2e negative reproducible)
+    add_test(NAME mini-codegen-${case}
+      COMMAND "${Python3_EXECUTABLE}" -I ${CMAKE_CURRENT_SOURCE_DIR}/npu/codegen/check_codegen.py
+        $<TARGET_FILE:mini-opt> $<TARGET_FILE:mini-npu-codegen> ${case})
+  endforeach()
+endif()
+
 if(MINI_ONNX_PYTHON)
   foreach(case IN ITEMS positive negative onnx)
     add_test(NAME npu-schedule-${case}
