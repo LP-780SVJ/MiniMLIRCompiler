@@ -36,3 +36,5 @@ LOAD 的源侧是 DRAM，STORE 的源侧是 SRAM。每侧的排他末端是 `bas
 模块验证从 SSA 重新核对整个布局、MatMul 的 `lhs_tensor_id/rhs_tensor_id/result_tensor_id` 和有序输出，Op 验证再解释每条命令。Buffer ID 只在单条 MatMul 内有效，必须按 Allocation 的 `id` 查找，即使数组重新排列也要解析到同一物理区间。
 
 Day 25 可用 `decodeDRAMLayout()`、`decodeCommands()` 和 `decodeMemoryPlan()` 读取命令。每条 MatMul 的 `event_index` 从 0 开始，与 `serial-mnk-single-buffer-v1` 对齐。按入口块的 MatMul 顺序执行，每条必须完成其 STORE 才能开始下一条；每个输出块的顺序固定为 `ZERO → [LOAD A → LOAD B → MATMUL_TILE] × K → STORE`。Day 25 要检查跨命令、跨 MatMul 的读写依赖和资源活跃状态；若改变顺序，必须重新验证复用前提。本阶段没有权重打包、ISA 编码、实际 DMA 或数值执行。
+
+全局顺序与独立状态检查已在 [Day 25 调度契约](scheduling-contract.md) 实现。

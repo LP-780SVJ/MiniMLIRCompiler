@@ -31,3 +31,13 @@ add_mlir_library(MLIRNPUDMAInsertion
   MLIRIR
   MLIRPass
 )
+
+add_mlir_library(MLIRNPUScheduler
+  NPUScheduler.cpp
+  PARTIAL_SOURCES_INTENDED
+
+  LINK_LIBS PUBLIC
+  MLIRNPUDialect
+  MLIRIR
+  MLIRPass
+)

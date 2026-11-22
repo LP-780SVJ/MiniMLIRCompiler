@@ -250,3 +250,11 @@ Tile IR，分别有 1 和 12 条记录。CTest **30/30 通过**。
 生成双 stride 的二维搬运。两个模型实测分别生成 5 / 44 条命令，
 有效 DMA 数据为 104 B / 112 KiB。权重与 SSA 保持，CTest 38/38 通过。
 见 [Day 24 验收](npu/day24-review.md) 和 [命令契约](npu/dma-contract.md)。
+
+## Day 25：全局调度与数据状态验证
+
+新增 `npu-schedule` 和模块 `npu.execution_schedule`。从物理存储读写
+构建依赖，以独立状态机核对装载、累加、写回和活跃区间。两个模型实际生成
+5 / 44 条调度记录和 4 / 93 条直接依赖，原始命令与权重保持。
+完整 CTest 42/42 通过。见 [Day 25 验收](npu/day25-review.md)
+和 [Day 26 输入契约](npu/scheduling-contract.md)。

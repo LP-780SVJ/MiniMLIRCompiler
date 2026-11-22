@@ -13,7 +13,7 @@ flowchart LR
     Compute --> Tile[Tile Plan IR]
     Tile --> SRAM[SRAM Memory Plan IR]
     SRAM --> Command[DMA / Command IR]
-    Command --> Schedule[Scheduling validation]
+    Command --> Schedule[Verified execution schedule]
     Schedule --> ISA[Virtual ISA]
     ISA --> Sim[Simulator]
     Sim --> Compare[数值比较]
@@ -36,7 +36,8 @@ Importer 保留模型语义、函数签名和 SSA。Graph IR 可以使用现有 
 | Implemented | [Day 22 Tiling](tiling-design.md)：`npu-tiling` 将完整 NPU MatMul 规划为原生块与有效尾块，产出可重读的 `npu.tiled_matmul`。 |
 | Implemented | [Day 23 SRAM Planning](sram-planning.md)：按生命周期分配、复用和验证地址，产出 `npu.sram_planned_matmul`。 |
 | Implemented | [Day 24 DRAM 与 Command IR](dma-contract.md)：稳定 Tensor ID、二维 DMA、ZERO、MatMul Tile 和写回。 |
-| Planned | 独立命令调度验证、Virtual ISA 与 Simulator。 |
+| Implemented | [Day 25 调度](scheduling-contract.md)：全局命令 ID、存储依赖、独立状态验证和确定的串行顺序。 |
+| Planned | Virtual ISA 与 Simulator。 |
 | Unsupported | 第一版动态 Shape、Batch MatMul、广播、控制流、自定义域与 External Data。NPU Compute 首版只接收 MatMul 计算。 |
 | Experimental | Coral 独立 MPACT G1 已通过。G2、G3 待验证。[Day 17 环境报告](coral/environment-report.md) |
 

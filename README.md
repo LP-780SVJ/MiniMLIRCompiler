@@ -37,6 +37,10 @@ Day 24 的 `npu-insert-dma` 为完整 Tensor 分配 DRAM 区间，并将 Tile �
 SRAM 绑定转成可验证的 ZERO、二维 DMA、MatMul 和写回命令。
 见 [命令契约](docs/npu/dma-contract.md) 和 [Day 24 验收](docs/npu/day24-review.md)。
 
+Day 25 的 `npu-schedule` 为原命令建立全局执行顺序和依赖，检查 SRAM
+地址复用、K 累加和跨 MatMul 的完整写回。见 [调度契约](docs/npu/scheduling-contract.md)
+和 [Day 25 验收](docs/npu/day25-review.md)。
+
 ## 构建与运行
 
 在 `AI-Compiler` 根目录运行，复用已有 LLVM/MLIR 构建：
@@ -46,7 +50,8 @@ cmake -S code/MiniMLIRCompiler -B code/MiniMLIRCompiler/build -G Ninja \
   -DMLIR_DIR="$PWD/llvm-project/build/lib/cmake/mlir" \
   -DLLVM_DIR="$PWD/llvm-project/build/lib/cmake/llvm" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build code/MiniMLIRCompiler/build --target mini-opt mini-sram-plan-test mini-command-plan-test -j 6
+cmake --build code/MiniMLIRCompiler/build \
+  --target mini-opt mini-sram-plan-test mini-command-plan-test mini-schedule-state-test -j 6
 ctest --test-dir code/MiniMLIRCompiler/build --output-on-failure
 ```
 
@@ -123,8 +128,8 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 
 ## 测试与当前边界
 
-Day 24 的 CTest **38/38 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
-Tile 与 SRAM 计划、DMA 命令、参考数据及错误注入。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
+Day 25 的 CTest **42/42 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
+Tile 与 SRAM 计划、DMA 命令、全局调度、参考数据及错误注入。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
 启用 Python 测试；未设置时可独立构建和测试 C++ 工程。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、

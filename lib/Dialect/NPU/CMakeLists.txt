@@ -9,6 +9,11 @@ add_mlir_dialect_library(MLIRNPUDialect
   DRAMLayout.cpp
   CommandPlan.cpp
   CommandPlanAttrs.cpp
+  CommandEffects.cpp
+  ScheduleDependencies.cpp
+  SchedulePlan.cpp
+  SchedulePlanAttrs.cpp
+  ScheduleState.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/NPU

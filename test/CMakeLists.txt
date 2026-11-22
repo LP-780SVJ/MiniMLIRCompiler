@@ -65,7 +65,17 @@ llvm_update_compile_flags(mini-command-plan-test)
 target_link_libraries(mini-command-plan-test PRIVATE MLIRNPUDialect)
 add_test(NAME npu-dma-address-arithmetic COMMAND $<TARGET_FILE:mini-command-plan-test>)
 
+add_executable(mini-schedule-state-test npu/schedule/ScheduleStateTest.cpp)
+llvm_update_compile_flags(mini-schedule-state-test)
+target_link_libraries(mini-schedule-state-test PRIVATE MLIRNPUDialect)
+add_test(NAME npu-schedule-state COMMAND $<TARGET_FILE:mini-schedule-state-test>)
+
 if(MINI_ONNX_PYTHON)
+  foreach(case IN ITEMS positive negative onnx)
+    add_test(NAME npu-schedule-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/schedule/check_npu_schedule.py
+        $<TARGET_FILE:mini-opt> ${case})
+  endforeach()
   foreach(case IN ITEMS positive negative onnx)
     add_test(NAME npu-dma-${case}
       COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/dma/check_dma_insertion.py

@@ -6,7 +6,8 @@
 | NPU Compute IR | MiniToNPU → `npu.matmul`、函数结构和常量 | 保留数学语义、函数签名、SSA 边与 Tensor 类型。可表达任意本契约内的完整静态二维 MatMul。 | Tiling 识别 M/N/K 与权重来源，为分块、地址和调度提供输入。 |
 | NPU Tile Plan IR | `npu-tiling` → `npu.tiled_matmul` | 完整 Tensor SSA 加上 M/N/K 切分、输出块 ID 和 K 归约边界。 | SRAM Planner 按有效尺寸和累加生命周期建立 Buffer 计划。 |
 | NPU SRAM Plan IR | `npu-sram-plan` → `npu.sram_planned_matmul` | 继续保留完整 Tensor 和 Tile，增加片上地址、活跃区间及每条 Tile 的 Buffer Binding。 | DMA Lowering 将 Tile 坐标与存储映射写成搬运命令。 |
-| NPU Command IR | `npu-insert-dma` → `npu.dram_layout` 与 `npu.command_matmul` | 显式记录 Tensor ID、字节地址、双行跨度和串行事件；保留 Tile、SRAM Binding 和 Tensor SSA。 | 独立调度验证、Virtual ISA 编码和执行。 |
+| NPU Command IR | `npu-insert-dma` → `npu.dram_layout` 与 `npu.command_matmul` | 显式记录 Tensor ID、字节地址、双行跨度和串行事件；保留 Tile、SRAM Binding 和 Tensor SSA。 | 全局调度和验证。 |
+| Scheduled Command IR | `npu-schedule` → 模块 `npu.execution_schedule` | 每条原始命令有唯一全局 ID、执行位置及可验证的依赖。命令地址和 Tensor 数据不变。 | Virtual ISA 编码和打包。 |
 
 ## 跟踪一个带权重 MatMul
 

@@ -1,6 +1,7 @@
 #include "NPU/NPUDialect.h"
 #include "NPU/CommandPlanAttrs.h"
 #include "NPU/NPUOps.h"
+#include "NPU/SchedulePlanAttrs.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -18,6 +19,20 @@ void mlir::npu::NPUDialect::initialize() {
 mlir::LogicalResult
 mlir::npu::NPUDialect::verifyOperationAttribute(Operation *op,
                                                NamedAttribute attr) {
+  if (attr.getName().strref() == executionScheduleAttr) {
+    auto module = dyn_cast<ModuleOp>(op);
+    if (!module)
+      return op->emitOpError("requires npu.execution_schedule on a module");
+    auto schedule = decodeSchedule(dyn_cast<DictionaryAttr>(attr.getValue()));
+    if (!schedule)
+      return op->emitOpError("NPU schedule: ") << llvm::toString(schedule.takeError());
+    auto input = readScheduleInput(module);
+    if (!input)
+      return op->emitOpError("NPU schedule: ") << llvm::toString(input.takeError());
+    if (auto error = verifySchedule(input->layout, input->matmuls, *schedule))
+      return op->emitOpError("NPU schedule: ") << llvm::toString(std::move(error));
+    return success();
+  }
   if (attr.getName().strref() != dramLayoutAttr)
     return success();
   auto module = dyn_cast<ModuleOp>(op);
