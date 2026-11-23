@@ -46,6 +46,11 @@ Day 26 的 `mini-npu-codegen` 将已验证的 Scheduled MLIR 导出为
 Python 标准库加载器验证。见 [Virtual ISA v1](docs/npu/isa-spec.md)、
 [程序 ABI](docs/npu/program-abi.md) 和 [Day 26 验收](docs/npu/day26-review.md)。
 
+Day 27 的 Virtual NPU Simulator 从程序包加载权重和指令，在独立的 DRAM
+和 SRAM 中解释四种 Opcode，并导出命名 FP32 NPZ。加权和多块 MatMul
+均从 ONNX 重新编译并通过数值比较。见 [Simulator 契约](docs/npu/simulator-contract.md)
+和 [Day 27 验收](docs/npu/day27-review.md)。
+
 ## 构建与运行
 
 在 `AI-Compiler` 根目录运行，复用已有 LLVM/MLIR 构建：
@@ -132,10 +137,9 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 
 ## 测试与当前边界
 
-Day 26 的 CTest **46/46 通过**，覆盖 Mini 与 NPU IR、ONNX 导入、目标转换、
-Tile 与 SRAM 计划、DMA 命令、全局调度、参考数据及程序包。CodeGen 和独立
-加载测试使用 Python 3 标准库。通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
-启用使用 ONNX 工具链的回归测试。
+Day 27 的 CTest **53/53 通过**，包含 Day 26 的 46 项和 7 项运行时测试。
+从 AI-Compiler 根目录配置时，通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
+启用 ONNX 导入和模拟器回归。执行已编译的程序包只需要 Python 与 NumPy。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
 可融合与不可融合的计算图、SSA 结果连接、输出重新解析、重复运行、
@@ -143,5 +147,5 @@ Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
 `docs/development-log.md`。
 
 CPU 路径输出标准 Tensor/Linalg/Arith IR，Bufferization、循环降级及
-CPU 执行尚待实现。Virtual NPU 路径输出独立程序包，Simulator 执行与
-数值对照将在后续阶段实现。
+CPU 执行尚待实现。Virtual NPU 路径可以生成和执行独立程序包。
+当前为功能级模拟，支持同步 DMA 和静态二维 FP32 MatMul。

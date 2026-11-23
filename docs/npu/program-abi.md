@@ -56,7 +56,8 @@ SSA 值只打包一次。零常量仍包含零长度的 `weights.bin` 和空条�
 3. 按有序 `inputs` 绑定调用者提供的 FP32 张量并检查形状。
 4. 按 Program 顺序解释指令，再按有序 `outputs` 读取并命名结果。
 
-独立加载器检查格式和边界，FP32 执行与输出比较由后续阶段实现。
+独立加载器检查格式和边界。[Simulator](simulator-contract.md) 在运行时
+检查 Buffer 生命周期并执行 FP32 指令，随后生成可供比较器读取的 NPZ。
 发布时 CodeGen 先写入同级临时目录，再调用随工具构建的同一加载器。
 在 macOS 或支持 `renameat2` 的 Linux 上，用原子移动发布，新路径存在
 时返回错误。导出工具要求 PATH 可找到 Python 3.7 或以上版本，目标父目录

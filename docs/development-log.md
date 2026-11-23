@@ -269,3 +269,15 @@ Weighted 和 Multi-Tile 程序包实测为 5 / 44 条指令、48 / 24,576 B
 权重，分别保持 104 B / 112 KiB 的 DMA 搬运量。完整 CTest 46/46 通过。
 见 [ISA](npu/isa-spec.md)、[Day 27 加载契约](npu/program-abi.md)
 和 [Day 26 验收](npu/day26-review.md)。
+
+## Day 27：Virtual NPU 功能级 Simulator
+
+复用 Day 26 加载器，通过字节内存、二维同步 DMA、逻辑 Buffer 生命周期及
+串行 FP32 K 累加执行原指令。通过 Manifest 在 DRAM 绑定权重和输入，完整
+写回后导出命名 NPZ。CLI 支持每条指令的 JSON Trace。
+
+两份真实 ONNX 重新走完整编译流水线。Weighted 的 5 条指令输出逐元素
+相等，Multi-Tile 的 44 条指令、12 次累加和 4 次写回均验证通过，
+最大绝对误差为 `7.62939453125e-06`。两个模型均有 0 个不匹配元素。
+完整 CTest **53/53**。见 [Simulator 契约](npu/simulator-contract.md) 与
+[Day 27 验收](npu/day27-review.md)。

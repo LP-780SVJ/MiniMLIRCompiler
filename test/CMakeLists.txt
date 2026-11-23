@@ -85,6 +85,16 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 if(MINI_ONNX_PYTHON)
+  foreach(suite IN ITEMS memory interpreter)
+    add_test(NAME npu-runtime-${suite}
+      COMMAND "${MINI_ONNX_PYTHON}" -B -m unittest discover -s test/runtime -p test_${suite}.py)
+    set_tests_properties(npu-runtime-${suite} PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+  endforeach()
+  foreach(case IN ITEMS weighted_matmul matmul_multitile negative tails chain)
+    add_test(NAME npu-runtime-${case}
+      COMMAND "${MINI_ONNX_PYTHON}" -B ${CMAKE_CURRENT_SOURCE_DIR}/runtime/check_simulator_cli.py
+        $<TARGET_FILE:mini-opt> $<TARGET_FILE:mini-npu-codegen> ${case})
+  endforeach()
   foreach(case IN ITEMS positive negative onnx)
     add_test(NAME npu-schedule-${case}
       COMMAND "${MINI_ONNX_PYTHON}" ${CMAKE_CURRENT_SOURCE_DIR}/npu/schedule/check_npu_schedule.py
