@@ -281,3 +281,15 @@ Weighted 和 Multi-Tile 程序包实测为 5 / 44 条指令、48 / 24,576 B
 最大绝对误差为 `7.62939453125e-06`。两个模型均有 0 个不匹配元素。
 完整 CTest **53/53**。见 [Simulator 契约](npu/simulator-contract.md) 与
 [Day 27 验收](npu/day27-review.md)。
+
+## Day 28 · 统一 E2E 与第四周验收
+
+新增 `run_e2e.py` 及共享 ONNX Metadata 和 CPU Reference 实现。
+从输入快照出发逐步编译、执行与比较，保存分层 IR、日志、Trace、
+文件摘要和统一报告。CodeGen 可从验证后的 MemoryPlan 将资源统计
+写到 Bundle 外。
+
+ONNX Runtime CPU 重新生成了六个正例的独立参考，全部满足原容差。
+分层错误注入、单元素扰动和 Bundle 字节级可复现性通过。完整
+CTest **62/62**。见 [复现命令](npu/e2e-validation.md)、
+[后端架构](npu/backend-architecture.md) 和 [第四周复盘](npu/week4-review.md)。

@@ -45,3 +45,11 @@ SRAM 起点须在保留区间之后并满足目标配置对齐。每条指令在
 依赖引用和内存访问边界。编译后端为同一输出块按 K 分块顺序使用 ZERO、
 多次 LOAD/累加和 STORE。指令解释与 FP32 舍入规则见
 [Simulator 契约](simulator-contract.md)。
+
+## E2E 一致性
+
+Day 28 逐条对比 Program 与 Trace 的公共字段及 Opcode 参数，再比对完成
+的指令数和实际 DMA 复制字节。编译期的 `compiler_stats.json` 与运行
+Trace 位于三文件 Bundle 之外。负例覆盖 DMA 地址越界、缺 LOAD、重复
+ZERO、提前 STORE、逻辑 Buffer 错配，以及权重文件摘要不符。
+见 [E2E 验证说明](e2e-validation.md)。

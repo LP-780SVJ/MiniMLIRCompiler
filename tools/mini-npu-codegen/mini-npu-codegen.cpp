@@ -8,6 +8,7 @@
 #include "mlir/Parser/Parser.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -35,10 +36,12 @@ cl::opt<std::string> input("input", cl::desc("Scheduled MLIR file"), cl::Require
 cl::opt<std::string> target("target", cl::desc("Virtual NPU target JSON"), cl::Required);
 cl::opt<std::string> metadata("model-metadata", cl::desc("Optional ONNX ABI metadata"));
 cl::opt<std::string> outDir("out-dir", cl::desc("New program package directory"), cl::Required);
+cl::opt<std::string> statsOut("stats-out", cl::desc("New compiler statistics JSON outside the package"));
 
-llvm::Error writeFile(StringRef path, StringRef bytes) {
+llvm::Error writeFile(StringRef path, StringRef bytes,
+                      llvm::sys::fs::CreationDisposition disposition = llvm::sys::fs::CD_CreateAlways) {
   std::error_code ec;
-  llvm::raw_fd_ostream file(path, ec, llvm::sys::fs::OF_None);
+  llvm::raw_fd_ostream file(path, ec, disposition, llvm::sys::fs::FA_Write, llvm::sys::fs::OF_None);
   if (ec)
     return llvm::createStringError(ec, "cannot create %s", path.str().c_str());
   file << bytes;
@@ -46,6 +49,8 @@ llvm::Error writeFile(StringRef path, StringRef bytes) {
   if (file.has_error()) {
     ec = file.error();
     file.clear_error();
+    if (disposition == llvm::sys::fs::CD_CreateNew)
+      llvm::sys::fs::remove(path);
     return llvm::createStringError(ec, "cannot write %s", path.str().c_str());
   }
   return llvm::Error::success();
@@ -122,6 +127,35 @@ llvm::Error publish(const ProgramPackage &package, StringRef executable) {
   return result;
 }
 
+llvm::Error checkStatsPath() {
+  std::error_code ec;
+  fs::path bundle = fs::weakly_canonical(outDir.getValue(), ec);
+  if (ec)
+    return llvm::createStringError(ec, "cannot resolve out-dir");
+  fs::path stats = fs::weakly_canonical(statsOut.getValue(), ec);
+  if (ec)
+    return llvm::createStringError(ec, "cannot resolve stats-out");
+  // weakly_canonical may leave a totally nonexistent relative path relative.
+  bundle = fs::absolute(bundle, ec);
+  if (ec)
+    return llvm::createStringError(ec, "cannot resolve out-dir");
+  stats = fs::absolute(stats, ec);
+  if (ec)
+    return llvm::createStringError(ec, "cannot resolve stats-out");
+  auto relative = stats.lexically_relative(bundle);
+  if (!relative.empty() && *relative.begin() != "..")
+    return llvm::createStringError("stats-out must be outside the program package");
+  if (!fs::is_directory(stats.parent_path(), ec))
+    return llvm::createStringError("stats-out parent directory must exist");
+  auto status = fs::symlink_status(statsOut.getValue(), ec);
+  if (status.type() != fs::file_type::not_found) {
+    if (ec)
+      return llvm::createStringError(ec, "cannot inspect stats-out");
+    return llvm::createStringError("stats-out already exists");
+  }
+  return llvm::Error::success();
+}
+
 llvm::Error generate(StringRef executable) {
   DialectRegistry registry;
   registry.insert<arith::ArithDialect, func::FuncDialect, mini::MiniDialect, NPUDialect>();
@@ -135,10 +169,22 @@ llvm::Error generate(StringRef executable) {
       /*RequiresNullTerminator=*/true, /*IsVolatile=*/true);
   if (!profile)
     return llvm::createStringError(profile.getError(), "cannot read target profile");
-  auto package = buildProgramPackage(*module, (*profile)->getBuffer(), metadata.getValue());
+  llvm::json::Object stats;
+  const bool emitStats = !statsOut.getValue().empty();
+  if (emitStats)
+    if (auto error = checkStatsPath())
+      return error;
+  auto package = buildProgramPackage(*module, (*profile)->getBuffer(), metadata.getValue(),
+                                     emitStats ? &stats : nullptr);
   if (!package)
     return package.takeError();
-  return publish(*package, executable);
+  if (auto error = publish(*package, executable))
+    return error;
+  if (emitStats)
+    return writeFile(statsOut.getValue(),
+                     llvm::formatv("{0:2}\n", llvm::json::Value(std::move(stats))).str(),
+                     llvm::sys::fs::CD_CreateNew);
+  return llvm::Error::success();
 }
 
 }

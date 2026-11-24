@@ -120,11 +120,53 @@ llvm::Error verifyTarget(ModuleOp module, const ScheduleInput &input,
   return llvm::Error::success();
 }
 
+Object collectCompilerStats(const ScheduleInput &input, const ExecutionSchedule &schedule,
+                            SRAMConfig sram) {
+  int64_t peak = 0, highWater = 0;
+  size_t tiles = 0, outputTiles = 0, edges = 0;
+  Array groups;
+  for (auto [index, group] : llvm::enumerate(input.matmuls)) {
+    const MemoryPlan &plan = group.memory;
+    size_t outputs = llvm::count_if(group.tiles, [](const TileDesc &tile) {
+      return tile.isFirstK;
+    });
+    groups.push_back(Object{
+        {"matmul_index", index},
+        {"operand_tensor_ids", Array{group.tensorIds[0], group.tensorIds[1]}},
+        {"result_tensor_id", group.tensorIds[2]},
+        {"matmul_tiles", group.tiles.size()},
+        {"output_tiles", outputs},
+        {"instruction_count", group.commands.size()},
+        {"peak_live_bytes", plan.peakLiveBytes},
+        {"arena_high_water_bytes", plan.arenaHighWaterBytes}});
+    tiles += group.tiles.size();
+    outputTiles += outputs;
+    peak = std::max(peak, plan.peakLiveBytes);
+    highWater = std::max(highWater, plan.arenaHighWaterBytes);
+  }
+  for (const auto &command : schedule.commands)
+    edges += command.dependencies.size();
+
+  return Object{
+      {"schema_version", 1},
+      {"target", virtualNPUTarget},
+      {"matmul_tiles", tiles},
+      {"output_tiles", outputTiles},
+      {"instruction_count", schedule.commands.size()},
+      {"direct_dependency_edges", edges},
+      {"memory", Object{{"sram_capacity_bytes", sram.capacityBytes},
+                        {"reserved_bytes", sram.reservedBytes},
+                        {"peak_live_bytes", peak},
+                        {"arena_high_water_bytes", highWater},
+                        {"dram_capacity_bytes", input.layout.totalBytes}}},
+      {"matmul_groups", std::move(groups)}};
+}
+
 }
 
 llvm::Expected<ProgramPackage>
 mlir::npu::buildProgramPackage(ModuleOp module, StringRef targetProfile,
-                              StringRef modelMetadataPath) {
+                              StringRef modelMetadataPath, Object *compilerStats) {
   if (!module->hasAttr(executionScheduleAttr))
     return llvm::createStringError("missing npu.execution_schedule; run npu-schedule first");
   auto input = readScheduleInput(module);
@@ -205,6 +247,8 @@ mlir::npu::buildProgramPackage(ModuleOp module, StringRef targetProfile,
                          {"instruction_count", static_cast<uint64_t>(schedule->commands.size())},
                          {"size_bytes", static_cast<uint64_t>(programBytes.size())},
                          {"sha256", sha256(programBytes)}}}};
+  if (compilerStats)
+    *compilerStats = collectCompilerStats(*input, *schedule, *sram);
   return ProgramPackage{std::move(programBytes), std::move(weights->bytes),
                         formatJSON(std::move(manifest))};
 }

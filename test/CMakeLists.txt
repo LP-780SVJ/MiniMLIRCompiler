@@ -85,6 +85,20 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 if(MINI_ONNX_PYTHON)
+  execute_process(COMMAND "${MINI_ONNX_PYTHON}" -B -c "from onnxruntime import InferenceSession"
+    RESULT_VARIABLE MINI_HAS_ORT OUTPUT_QUIET ERROR_QUIET)
+  if(MINI_HAS_ORT STREQUAL "0")
+    foreach(case IN ITEMS small weighted multitile chain tails multioutput negative comparator-negative reproducible)
+      add_test(NAME npu-e2e-${case}
+        COMMAND "${MINI_ONNX_PYTHON}" -B ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_e2e_driver.py
+          $<TARGET_FILE:mini-opt> $<TARGET_FILE:mini-npu-codegen> ${case})
+      if(DEFINED ENV{PYTHONPATH})
+        set_tests_properties(npu-e2e-${case} PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}")
+      endif()
+    endforeach()
+  else()
+    message(STATUS "Day 28 E2E tests require ONNX Runtime in MINI_ONNX_PYTHON; not registering them")
+  endif()
   foreach(suite IN ITEMS memory interpreter)
     add_test(NAME npu-runtime-${suite}
       COMMAND "${MINI_ONNX_PYTHON}" -B -m unittest discover -s test/runtime -p test_${suite}.py)

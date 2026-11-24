@@ -2,7 +2,6 @@
 """Generate reproducible ONNX fixtures and optional CPU reference outputs."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
@@ -10,11 +9,15 @@ import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper, shape_inference
 
+if __package__:
+    from .e2e_metadata import CPU_PROVIDER, build_metadata, run_reference
+else:
+    from e2e_metadata import CPU_PROVIDER, build_metadata, run_reference
+
 
 FIXTURE = "matmul_relu"
 OPSET = 18
 IR_VERSION = 9
-CPU_PROVIDER = "CPUExecutionProvider"
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "test" / "e2e"
 
 
@@ -104,42 +107,6 @@ def shapes(value_infos):
     }
 
 
-def run_reference(model_bytes, feeds, input_shapes, output_shapes):
-    try:
-        import onnxruntime as ort
-    except ModuleNotFoundError as error:
-        if error.name != "onnxruntime":
-            raise
-        raise SystemExit("--with-reference requires the onnxruntime package") from error
-
-    session = ort.InferenceSession(model_bytes, providers=[CPU_PROVIDER])
-    if session.get_providers() != [CPU_PROVIDER]:
-        raise RuntimeError(f"unexpected reference providers: {session.get_providers()}")
-    for values, expected_shapes, arrays in (
-        (session.get_inputs(), input_shapes, feeds),
-        (session.get_outputs(), output_shapes, None),
-    ):
-        if [value.name for value in values] != list(expected_shapes):
-            raise ValueError("ONNX Runtime tensor names or order differ from the model")
-        for value in values:
-            expected = tuple(expected_shapes[value.name])
-            if value.type != "tensor(float)" or tuple(value.shape) != expected:
-                raise ValueError(f"unexpected ONNX Runtime metadata for {value.name}")
-            if arrays is not None:
-                array = arrays[value.name]
-                if array.dtype != np.float32 or array.shape != expected:
-                    raise ValueError(f"invalid fixture input {value.name}")
-
-    output_names = list(output_shapes)
-    outputs = dict(zip(output_names, session.run(output_names, feeds), strict=True))
-    for name, array in outputs.items():
-        if array.dtype != np.float32 or array.shape != tuple(output_shapes[name]):
-            raise ValueError(f"invalid reference output type or shape for {name}")
-        if not np.isfinite(array).all():
-            raise ValueError(f"non-finite reference output for {name}")
-    return outputs, ort.__version__
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
@@ -169,9 +136,15 @@ def write_fixture(name, model, feeds, seed, output_dir, with_reference):
     reference = None
     ort_version = None
     if with_reference:
-        reference, ort_version = run_reference(
-            model_bytes, feeds, input_shapes, output_shapes
-        )
+        try:
+            reference, ort_version = run_reference(
+                model_bytes, feeds, input_shapes, output_shapes
+            )
+        except RuntimeError as error:
+            raise SystemExit(str(error)) from error
+        for tensor_name, array in reference.items():
+            if not np.isfinite(array).all():
+                raise ValueError(f"non-finite reference output for {tensor_name}")
 
     for directory in ("models", "inputs"):
         (output_dir / directory).mkdir(parents=True, exist_ok=True)
@@ -181,23 +154,11 @@ def write_fixture(name, model, feeds, seed, output_dir, with_reference):
 
     metadata_path = output_dir / metadata_file
     metadata = {
-        "schema_version": 1,
-        "opset": OPSET,
-        "onnx_ir_version": IR_VERSION,
-        "onnx_version": onnx.__version__,
-        "numpy_version": np.__version__,
-        "dtype": "float32",
+        **build_metadata(model, model_bytes, input_path.read_bytes(), "virtual-npu-v1"),
         "seed": seed,
-        "input_names": list(input_shapes),
-        "output_names": list(output_shapes),
-        "inputs": input_shapes,
-        "outputs": output_shapes,
         "intermediates": intermediate_shapes,
-        "target": "virtual-npu-v1",
         "rtol": 1e-4,
         "atol": 1e-5,
-        "model_sha256": hashlib.sha256(model_bytes).hexdigest(),
-        "inputs_sha256": hashlib.sha256(input_path.read_bytes()).hexdigest(),
         "model_file": model_file.as_posix(),
         "inputs_file": input_file.as_posix(),
     }

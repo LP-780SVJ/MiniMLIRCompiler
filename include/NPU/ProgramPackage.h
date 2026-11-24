@@ -20,7 +20,8 @@ struct ProgramPackage {
 llvm::Expected<PackedWeights> packWeights(ModuleOp module, const DRAMLayout &layout);
 llvm::Expected<ProgramPackage>
 buildProgramPackage(ModuleOp module, llvm::StringRef targetProfile,
-                    llvm::StringRef modelMetadataPath);
+                    llvm::StringRef modelMetadataPath,
+                    llvm::json::Object *compilerStats = nullptr);
 
 }
 

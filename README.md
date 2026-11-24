@@ -51,6 +51,11 @@ Day 27 的 Virtual NPU Simulator 从程序包加载权重和指令，在独立�
 均从 ONNX 重新编译并通过数值比较。见 [Simulator 契约](docs/npu/simulator-contract.md)
 和 [Day 27 验收](docs/npu/day27-review.md)。
 
+Day 28 的 [统一 E2E 入口](docs/npu/e2e-validation.md) 接收 ONNX 和输入 NPZ，
+保存各阶段 IR，导出程序包，在 Simulator 执行并与独立 CPU 参考比较。
+已验证 Small、Weighted、Multi-Tile、真实双 MatMul、尾块和多输出。
+见 [后端架构](docs/npu/backend-architecture.md) 和 [第四周复盘](docs/npu/week4-review.md)。
+
 ## 构建与运行
 
 在 `AI-Compiler` 根目录运行，复用已有 LLVM/MLIR 构建：
@@ -137,9 +142,10 @@ Conversion Pattern，生成 `tensor.empty`、`linalg.generic` 和 Region
 
 ## 测试与当前边界
 
-Day 27 的 CTest **53/53 通过**，包含 Day 26 的 46 项和 7 项运行时测试。
+Day 28 的 CTest **62/62 通过**，包含 Day 27 的 53 项与新增的 9 项 E2E。
 从 AI-Compiler 根目录配置时，通过 `-DMINI_ONNX_PYTHON="$PWD/.venv/bin/python"`
-启用 ONNX 导入和模拟器回归。执行已编译的程序包只需要 Python 与 NumPy。
+启用 ONNX 导入和模拟器回归。完整 E2E 测试需要该 Python 环境可加载
+ONNX Runtime，执行已编译的程序包只需要 Python 与 NumPy。
 
 Day 13 的完整 CTest **12/12 通过**。测试覆盖四种独立 Lowering、
 可融合与不可融合的计算图、SSA 结果连接、输出重新解析、重复运行、

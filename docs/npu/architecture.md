@@ -40,6 +40,7 @@ Importer 保留模型语义、函数签名和 SSA。Graph IR 可以使用现有 
 | Implemented | [Day 25 调度](scheduling-contract.md)：全局命令 ID、存储依赖、独立状态验证和确定的串行顺序。 |
 | Implemented | [Day 26 Virtual ISA](isa-spec.md) 与 [程序 ABI](program-abi.md)，可从 Scheduled IR 导出和独立验证程序包。 |
 | Implemented | [Day 27 Simulator](simulator-contract.md) 实现独立指令执行、同步 DMA、串行 FP32 累加和 NPZ 导出。[真实模型数值验收](day27-review.md) |
+| Implemented | [Day 28 E2E Driver](e2e-validation.md) 保存分阶段 IR，编译执行并与独立 CPU 参考比较。[后端分层](backend-architecture.md) · [Week 4 验收](week4-review.md) |
 | Unsupported | 第一版动态 Shape、Batch MatMul、广播、控制流、自定义域与 External Data。NPU Compute 首版只接收 MatMul 计算。 |
 | Experimental | Coral 独立 MPACT G1 已通过。G2、G3 待验证。[Day 17 环境报告](coral/environment-report.md) |
 
